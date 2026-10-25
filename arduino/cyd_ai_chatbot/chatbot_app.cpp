@@ -32,8 +32,8 @@ constexpr const char *kNtpServer1 = "pool.ntp.org";
 constexpr const char *kNtpServer2 = "time.google.com";
 constexpr time_t kValidEpoch = 1700000000;  // anything earlier means NTP has not answered yet
 
-Adafruit_ST7789 tft(&SPI, PIN_LCD_CS, PIN_LCD_DC, PIN_LCD_RST);
-TouchXpt2046 touch(SPI, PIN_TOUCH_CS, kScreenW, kScreenH);
+Adafruit_ST7789 tft(&SPI, CYD_PIN_LCD_CS, CYD_PIN_LCD_DC, CYD_PIN_LCD_RST);
+TouchXpt2046 touch(SPI, CYD_PIN_TOUCH_CS, kScreenW, kScreenH);
 ChatUi ui(tft);
 ClaudeClient claude;
 AppSettings settings;
@@ -50,7 +50,7 @@ String serialLine;
 void setLed(uint8_t r, uint8_t g, uint8_t b)
 {
 #if RGB_LED_ENABLED
-    rgbLedWrite(PIN_RGB_LED, (uint16_t)r * RGB_LED_LEVEL / 255, (uint16_t)g * RGB_LED_LEVEL / 255,
+    rgbLedWrite(CYD_PIN_RGB_LED, (uint16_t)r * RGB_LED_LEVEL / 255, (uint16_t)g * RGB_LED_LEVEL / 255,
                 (uint16_t)b * RGB_LED_LEVEL / 255);
 #endif
 }
@@ -58,19 +58,19 @@ void setLed(uint8_t r, uint8_t g, uint8_t b)
 void setBacklight(uint8_t percent)
 {
     const uint32_t maxDuty = (1U << BACKLIGHT_PWM_BITS) - 1;
-    ledcWrite(PIN_LCD_BACKLIGHT, maxDuty * min<uint8_t>(percent, 100) / 100);
+    ledcWrite(CYD_PIN_LCD_BACKLIGHT, maxDuty * min<uint8_t>(percent, 100) / 100);
 }
 
 void initDisplay()
 {
     // All devices on the shared bus must be deselected before the first transfer.
-    for (int8_t cs : {PIN_LCD_CS, PIN_TOUCH_CS, PIN_SD_CS}) {
+    for (int8_t cs : {CYD_PIN_LCD_CS, CYD_PIN_TOUCH_CS, CYD_PIN_SD_CS}) {
         pinMode(cs, OUTPUT);
         digitalWrite(cs, HIGH);
     }
-    SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+    SPI.begin(CYD_PIN_SPI_SCK, CYD_PIN_SPI_MISO, CYD_PIN_SPI_MOSI);
 
-    ledcAttach(PIN_LCD_BACKLIGHT, BACKLIGHT_PWM_HZ, BACKLIGHT_PWM_BITS);
+    ledcAttach(CYD_PIN_LCD_BACKLIGHT, BACKLIGHT_PWM_HZ, BACKLIGHT_PWM_BITS);
     setBacklight(LCD_BRIGHTNESS_PERCENT);
 
     tft.init(LCD_NATIVE_WIDTH, LCD_NATIVE_HEIGHT);
@@ -166,10 +166,10 @@ void runTouchCalibration()
 
 bool bootButtonHeld()
 {
-    pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
+    pinMode(CYD_PIN_BOOT_BUTTON, INPUT_PULLUP);
     const uint32_t start = millis();
     while (millis() - start < kBootHoldWindowMs) {
-        if (digitalRead(PIN_BOOT_BUTTON) == LOW) {
+        if (digitalRead(CYD_PIN_BOOT_BUTTON) == LOW) {
             return true;
         }
         delay(10);
