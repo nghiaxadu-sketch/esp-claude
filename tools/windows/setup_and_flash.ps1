@@ -128,50 +128,101 @@ Ok "Đã cài esptool"
 $File = if ($Flash -eq "hwtest") { $HwBin } else { $FwBin }
 if (-not (Test-Path $File)) { Fail "Không có file $File" }
 
-# Cổng ESP32: ưu tiên VID Espressif 303A. ROM của ESP32-S31 đổi cổng khi vào chế độ nạp nên tìm lại mỗi lần thử.
-function Find-Port {
+# ---------- Tìm cổng ----------
+# ESP-Mosaico cắm Type-C trực tiếp -> cổng VID 303A (Espressif). Cổng CH340/CP210x/FTDI chỉ đúng khi
+# nối dây USB-UART vào pad TX/RX/GND mặt sau. Cổng Bluetooth luôn bỏ qua.
+function Get-Ports {
     $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    $list = @(& $VenvPy -c "import serial.tools.list_ports as l; [print(p.device, '%04X' % (p.vid or 0), p.description) for p in l.comports()]")
+    $rows = @(& $VenvPy -c "import serial.tools.list_ports as l; [print('%s|%04X|%s' % (p.device, p.vid or 0, p.description)) for p in l.comports()]")
     $ErrorActionPreference = $prev
-    $esp = @($list | Where-Object { ($_ -split ' ')[1] -eq '303A' })
-    if ($esp.Count -ge 1) { return ($esp[0] -split ' ')[0] }
-    if ($list.Count -eq 1) {
-        # ESP-Mosaico cắm Type-C trực tiếp (VID 303A), không qua CH340/CP210x. Cổng khác chỉ dùng khi nối dây USB-UART vào pad TX/RX.
-        Warn "Chỉ thấy cổng: $($list[0]) - KHÔNG phải cổng Type-C của ESP-Mosaico (Espressif 303A)."
-        Warn "Nếu chưa vào chế độ nạp: tắt máy -> giữ BOOT -> nhấn POWER, dùng cáp USB-C có data, rồi Enter để quét lại."
-        $ans = (Read-Host "Gõ 'y' để vẫn dùng cổng này (dây USB-UART nối pad TX/RX), Enter để quét lại").Trim().ToLower()
-        if ($ans -eq 'y') { return ($list[0] -split ' ')[0] }
-        return $null
-    }
-    if ($list.Count -gt 1) {
-        Warn "Có nhiều cổng COM:"
-        $list | ForEach-Object { Write-Host "   $_" }
-        $sel = (Read-Host "Nhập cổng của ESP32 (vd COM3)").Trim().ToUpper()
-        if ($sel -notmatch '^COM\d+$') { Fail "Cổng không hợp lệ: '$sel'. Chạy lại với -Port COMx." }
-        return $sel
-    }
-    return $null
+    @($rows | ForEach-Object {
+        $f = $_ -split '\|', 3
+        [pscustomobject]@{ Port = $f[0]; Vid = $f[1]; Name = $f[2] }
+    } | Where-Object { $_.Vid -ne '0000' -and $_.Name -notmatch 'Bluetooth' })
 }
 
-$ok = $false
-for ($try = 1; $try -le 3; $try++) {
-    $p = if ($Port) { $Port } else { Find-Port }
-    if (-not $p) {
-        Warn "Lần $($try): chưa thấy máy. Tắt máy -> giữ BOOT -> nhấn POWER -> thả BOOT (cáp USB-C có data)."
-        Start-Sleep -Seconds 5
+function Select-Port {
+    if ($Port) { return [pscustomobject]@{ Port = $Port; Vid = 'USER'; Name = $Port } }
+    $ports = Get-Ports
+    $esp = @($ports | Where-Object { $_.Vid -eq '303A' })
+    if ($esp.Count -ge 1) { return $esp[0] }
+    if ($ports.Count -eq 0) { return $null }
+    if ($ports.Count -eq 1) { $c = $ports[0] } else {
+        Warn "Có nhiều cổng USB-serial:"
+        $ports | ForEach-Object { Write-Host "   $($_.Port)  $($_.Name)" }
+        $sel = (Read-Host "Nhập cổng của ESP-Mosaico (vd COM5)").Trim().ToUpper()
+        $c = $ports | Where-Object { $_.Port -eq $sel } | Select-Object -First 1
+        if (-not $c) { Fail "Cổng không hợp lệ: '$sel'." }
+    }
+    Warn "$($c.Port) là $($c.Name), không phải cổng Type-C của ESP-Mosaico (Espressif 303A)."
+    Warn "Chỉ đúng nếu anh đang nối dây USB-UART vào pad TX/RX/GND (TX->RX, RX->TX, GND->GND)."
+    return $c
+}
+
+# ---------- Gọi esptool, trả về (thành công, nội dung log) ----------
+function Invoke-Esptool([string]$p, [string]$before, [string[]]$cmd) {
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    $out = & $VenvPy -m esptool --port $p --baud 115200 --before $before --after no-reset @cmd 2>&1 | Out-String
+    $code = $LASTEXITCODE; $ErrorActionPreference = $prev
+    Write-Host $out
+    return @(($code -eq 0), $out)
+}
+
+function Wait-BootMode([string]$why) {
+    Warn $why
+    Write-Host "   1. Tắt máy (giữ POWER đến khi tắt)."
+    Write-Host "   2. Giữ nút BOOT, nhấn POWER, rồi thả BOOT. Màn hình tối là đúng."
+    Write-Host "   3. Đóng Arduino IDE / Serial Monitor / tab esptool-js nếu đang mở."
+    Read-Host "Làm xong nhấn Enter"
+}
+
+# ---------- 1. Kết nối + xác định chip ----------
+$conn = $null; $before = $null
+for ($try = 1; $try -le 3 -and -not $conn; $try++) {
+    $c = Select-Port
+    if (-not $c) {
+        Wait-BootMode "Lần $($try): chưa thấy cổng nào của máy (cáp USB-C phải có data)."
         continue
     }
-    Ok "Lần $($try): nạp $File vào $p"
-    # Không reset qua DTR/RTS: cổng USB của ROM S31 rớt kết nối ("device not functioning") nếu bị reset từ máy tính.
-    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-    & $VenvPy -m esptool --port $p --baud 460800 --before no_reset --after no_reset write_flash 0x0 $File
-    $code = $LASTEXITCODE; $ErrorActionPreference = $prev
-    if ($code -eq 0) { $ok = $true; $Port = $p; break }
-    Warn "Không mở được $p. Đóng Arduino IDE / Serial Monitor / tab esptool-js nếu đang mở; thử lại sau 4 giây..."
-    Start-Sleep -Seconds 4
+    $modes = if ($c.Vid -eq '303A') { @('no-reset') } else { @('default-reset', 'no-reset') }
+    foreach ($m in $modes) {
+        Ok "Lần $($try): hỏi chip trên $($c.Port) (reset: $m)"
+        $r = Invoke-Esptool $c.Port $m @('chip-id')
+        if ($r[0]) { $conn = $c; $before = $m; $chipLog = $r[1]; break }
+    }
+    if (-not $conn) {
+        if ($r[1] -match 'Invalid head of packet|No serial data received|Failed to connect') {
+            Wait-BootMode "Chip đang chạy chương trình, chưa ở chế độ nạp."
+        } elseif ($r[1] -match 'could not open|PermissionError|busy|not functioning') {
+            Wait-BootMode "Cổng bị chiếm hoặc lỗi driver. Rút cáp, cắm lại."
+        } else {
+            Wait-BootMode "Không kết nối được."
+        }
+    }
 }
-if (-not $ok) { Fail "Nạp lỗi 3 lần. Rút cáp, cắm lại, tắt máy -> giữ BOOT -> nhấn POWER rồi chạy lại." }
+if (-not $conn) {
+    Fail "Không kết nối được sau 3 lần. Đổi cáp USB-C có data, cắm thẳng cổng USB máy tính, xem Device Manager -> Ports."
+}
+
+$chip = if ($chipLog -match 'Chip type:\s*([^\r\n(]+)') { $Matches[1].Trim() }
+        elseif ($chipLog -match 'Detecting chip type\.*\s*([^\r\n]+)') { $Matches[1].Trim() } else { "?" }
+Ok "Chip: $chip"
+if ($chip -notmatch 'S31') {
+    Fail "Thiết bị trên $($conn.Port) là '$chip', KHÔNG phải ESP-Mosaico (ESP32-S31). Không nạp để tránh hỏng. Rút thiết bị đó ra, cắm ESP-Mosaico bằng cáp USB-C rồi chạy lại."
+}
+
+# ---------- 2. Nạp ----------
+Ok "Nạp $File vào $($conn.Port)"
+$r = Invoke-Esptool $conn.Port $before @('--chip', 'esp32s31', 'write-flash', '0x0', $File)
+if (-not $r[0]) {
+    Wait-BootMode "Nạp bị ngắt giữa chừng, thử lại một lần."
+    $r = Invoke-Esptool $conn.Port 'no-reset' @('--chip', 'esp32s31', 'write-flash', '0x0', $File)
+    if (-not $r[0]) { Fail "Nạp lỗi. Gửi đoạn log ở trên cho Claude." }
+}
+$Port = $conn.Port
 Ok "Nạp xong. Bấm POWER để khởi động lại máy."
+
+function Find-Port { $c = Select-Port; if ($c) { $c.Port } }
 
 if ($Flash -eq "hwtest") {
     Write-Host "Mở log self-test (Ctrl+] để thoát). Kết quả: 1 rung dài = PASS, 3 rung ngắn = lỗi."
