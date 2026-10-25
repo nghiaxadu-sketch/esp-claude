@@ -8,7 +8,7 @@
     powershell -ExecutionPolicy Bypass -File .\setup_and_flash.ps1 -Flash none     # chỉ gom, không nạp
   Thêm -Port COM5 nếu có nhiều cổng COM.
 
-  Cần: Git for Windows, Python 3. Lần đầu nạp: tắt máy -> giữ BOOT -> nhấn POWER rồi mới chạy.
+  Cần: Git for Windows, Python 3.10-3.13 (khuyên 3.12; 3.14+ chưa có wheel PyYAML). Lần đầu nạp: tắt máy -> giữ BOOT -> nhấn POWER rồi mới chạy.
 #>
 param(
     [ValidateSet("hwtest", "firmware", "none")]
@@ -76,25 +76,52 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 if ($Flash -eq "none") { Ok "Xong (không nạp)."; exit 0 }
 
 # 3. Nạp
-python -m pip install --quiet --upgrade esptool pyserial
+# Python quá mới (3.14+) chưa có wheel PyYAML -> pip đòi MSVC. Ưu tiên 3.13/3.12/3.11/3.10 qua py launcher, cài vào venv riêng.
+$BasePy = $null
+foreach ($v in "3.13", "3.12", "3.11", "3.10") {
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        py "-$v" -c "import sys" 2>$null
+        if ($LASTEXITCODE -eq 0) { $BasePy = @("py", "-$v"); break }
+    }
+}
+if (-not $BasePy) {
+    Warn "Không thấy Python 3.10-3.13, dùng 'python' mặc định (nếu là 3.14+ có thể lỗi build PyYAML -> cài Python 3.12)."
+    $BasePy = @("python")
+}
+$Venv = Join-Path $Root ".venv"
+$VenvPy = Join-Path $Venv "Scripts\python.exe"
+if (-not (Test-Path $VenvPy)) {
+    & $BasePy[0] $BasePy[1..($BasePy.Count)] -m venv $Venv
+    if ($LASTEXITCODE -ne 0) { Fail "Không tạo được venv $Venv" }
+}
+& $VenvPy -m pip install --quiet --prefer-binary --upgrade esptool pyserial
+if ($LASTEXITCODE -ne 0) { Fail "Cài esptool lỗi. Cài Python 3.12 (https://www.python.org/downloads/release/python-3120/) rồi xoá thư mục $Venv và chạy lại." }
 $File = if ($Flash -eq "hwtest") { $HwBin } else { $FwBin }
 if (-not (Test-Path $File)) { Fail "Không có file $File" }
 
 if (-not $Port) {
-    $ports = [System.IO.Ports.SerialPort]::GetPortNames()
+    $ports = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '\((COM\d+)\)' } |
+        ForEach-Object { [pscustomobject]@{ Port = $Matches[1]; Name = $_.Name } })
     if ($ports.Count -eq 0) { Fail "Không thấy cổng COM. Cắm cáp USB-C có data, tắt máy -> giữ BOOT -> nhấn POWER rồi chạy lại." }
-    if ($ports.Count -gt 1) { Fail "Có nhiều cổng: $($ports -join ', '). Chạy lại với -Port COMx." }
-    $Port = $ports[0]
+    if ($ports.Count -eq 1) {
+        $Port = $ports[0].Port
+    } else {
+        Warn "Có nhiều cổng COM:"
+        $ports | ForEach-Object { Write-Host "   $($_.Name)" }
+        $Port = (Read-Host "Nhập cổng của ESP32 (vd COM3)").Trim().ToUpper()
+        if ($Port -notmatch '^COM\d+$') { Fail "Cổng không hợp lệ: '$Port'. Chạy lại với -Port COMx." }
+    }
 }
 Ok "Nạp $File vào $Port"
-python -m esptool --port $Port --baud 921600 write_flash 0x0 $File
+& $VenvPy -m esptool --port $Port --baud 921600 write_flash 0x0 $File
 if ($LASTEXITCODE -ne 0) { Fail "Nạp lỗi. Thử lại sau khi: tắt máy -> giữ BOOT -> nhấn POWER." }
 Ok "Nạp xong. Bấm POWER (hoặc RESET) để chạy."
 
 if ($Flash -eq "hwtest") {
     Write-Host "Mở log self-test (Ctrl+] để thoát). Kết quả: 1 rung dài = PASS, 3 rung ngắn = lỗi."
     Start-Sleep -Seconds 3
-    python -m serial.tools.miniterm $Port 115200
+    & $VenvPy -m serial.tools.miniterm $Port 115200
 } else {
     Write-Host "Máy phát Wi-Fi 'esp-claw-xxxx': kết nối vào, trang cài đặt tự mở (hoặc http://192.168.4.1)."
 }
