@@ -135,7 +135,14 @@ function Find-Port {
     $ErrorActionPreference = $prev
     $esp = @($list | Where-Object { ($_ -split ' ')[1] -eq '303A' })
     if ($esp.Count -ge 1) { return ($esp[0] -split ' ')[0] }
-    if ($list.Count -eq 1) { return ($list[0] -split ' ')[0] }
+    if ($list.Count -eq 1) {
+        # ESP-Mosaico cắm Type-C trực tiếp (VID 303A), không qua CH340/CP210x. Cổng khác chỉ dùng khi nối dây USB-UART vào pad TX/RX.
+        Warn "Chỉ thấy cổng: $($list[0]) - KHÔNG phải cổng Type-C của ESP-Mosaico (Espressif 303A)."
+        Warn "Nếu chưa vào chế độ nạp: tắt máy -> giữ BOOT -> nhấn POWER, dùng cáp USB-C có data, rồi Enter để quét lại."
+        $ans = (Read-Host "Gõ 'y' để vẫn dùng cổng này (dây USB-UART nối pad TX/RX), Enter để quét lại").Trim().ToLower()
+        if ($ans -eq 'y') { return ($list[0] -split ' ')[0] }
+        return $null
+    }
     if ($list.Count -gt 1) {
         Warn "Có nhiều cổng COM:"
         $list | ForEach-Object { Write-Host "   $_" }
