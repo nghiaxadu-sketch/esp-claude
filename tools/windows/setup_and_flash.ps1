@@ -128,29 +128,49 @@ Ok "Đã cài esptool"
 $File = if ($Flash -eq "hwtest") { $HwBin } else { $FwBin }
 if (-not (Test-Path $File)) { Fail "Không có file $File" }
 
-if (-not $Port) {
-    $ports = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '\((COM\d+)\)' } |
-        ForEach-Object { [pscustomobject]@{ Port = $Matches[1]; Name = $_.Name } })
-    if ($ports.Count -eq 0) { Fail "Không thấy cổng COM. Cắm cáp USB-C có data, tắt máy -> giữ BOOT -> nhấn POWER rồi chạy lại." }
-    if ($ports.Count -eq 1) {
-        $Port = $ports[0].Port
-    } else {
+# Cổng ESP32: ưu tiên VID Espressif 303A. ROM của ESP32-S31 đổi cổng khi vào chế độ nạp nên tìm lại mỗi lần thử.
+function Find-Port {
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    $list = @(& $VenvPy -c "import serial.tools.list_ports as l; [print(p.device, '%04X' % (p.vid or 0), p.description) for p in l.comports()]")
+    $ErrorActionPreference = $prev
+    $esp = @($list | Where-Object { ($_ -split ' ')[1] -eq '303A' })
+    if ($esp.Count -ge 1) { return ($esp[0] -split ' ')[0] }
+    if ($list.Count -eq 1) { return ($list[0] -split ' ')[0] }
+    if ($list.Count -gt 1) {
         Warn "Có nhiều cổng COM:"
-        $ports | ForEach-Object { Write-Host "   $($_.Name)" }
-        $Port = (Read-Host "Nhập cổng của ESP32 (vd COM3)").Trim().ToUpper()
-        if ($Port -notmatch '^COM\d+$') { Fail "Cổng không hợp lệ: '$Port'. Chạy lại với -Port COMx." }
+        $list | ForEach-Object { Write-Host "   $_" }
+        $sel = (Read-Host "Nhập cổng của ESP32 (vd COM3)").Trim().ToUpper()
+        if ($sel -notmatch '^COM\d+$') { Fail "Cổng không hợp lệ: '$sel'. Chạy lại với -Port COMx." }
+        return $sel
     }
+    return $null
 }
-Ok "Nạp $File vào $Port"
-& $VenvPy -m esptool --port $Port --baud 921600 write_flash 0x0 $File
-if ($LASTEXITCODE -ne 0) { Fail "Nạp lỗi. Thử lại sau khi: tắt máy -> giữ BOOT -> nhấn POWER." }
-Ok "Nạp xong. Bấm POWER (hoặc RESET) để chạy."
+
+$ok = $false
+for ($try = 1; $try -le 3; $try++) {
+    $p = if ($Port) { $Port } else { Find-Port }
+    if (-not $p) {
+        Warn "Lần $($try): chưa thấy máy. Tắt máy -> giữ BOOT -> nhấn POWER -> thả BOOT (cáp USB-C có data)."
+        Start-Sleep -Seconds 5
+        continue
+    }
+    Ok "Lần $($try): nạp $File vào $p"
+    # Không reset qua DTR/RTS: cổng USB của ROM S31 rớt kết nối ("device not functioning") nếu bị reset từ máy tính.
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & $VenvPy -m esptool --port $p --baud 460800 --before no_reset --after no_reset write_flash 0x0 $File
+    $code = $LASTEXITCODE; $ErrorActionPreference = $prev
+    if ($code -eq 0) { $ok = $true; $Port = $p; break }
+    Warn "Không mở được $p. Đóng Arduino IDE / Serial Monitor / tab esptool-js nếu đang mở; thử lại sau 4 giây..."
+    Start-Sleep -Seconds 4
+}
+if (-not $ok) { Fail "Nạp lỗi 3 lần. Rút cáp, cắm lại, tắt máy -> giữ BOOT -> nhấn POWER rồi chạy lại." }
+Ok "Nạp xong. Bấm POWER để khởi động lại máy."
 
 if ($Flash -eq "hwtest") {
     Write-Host "Mở log self-test (Ctrl+] để thoát). Kết quả: 1 rung dài = PASS, 3 rung ngắn = lỗi."
-    Start-Sleep -Seconds 3
-    & $VenvPy -m serial.tools.miniterm $Port 115200
+    Read-Host "Bấm POWER cho máy chạy, rồi nhấn Enter ở đây để mở log"
+    $logPort = Find-Port
+    if ($logPort) { & $VenvPy -m serial.tools.miniterm $logPort 115200 } else { Warn "Không thấy cổng log; xem kết quả bằng motor rung." }
 } else {
     Write-Host "Máy phát Wi-Fi 'esp-claw-xxxx': kết nối vào, trang cài đặt tự mở (hoặc http://192.168.4.1)."
 }
