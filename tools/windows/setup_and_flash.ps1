@@ -80,8 +80,10 @@ if ($Flash -eq "none") { Ok "Xong (không nạp)."; exit 0 }
 function Find-Py {
     foreach ($v in "3.13", "3.12", "3.11", "3.10") {
         if (Get-Command py -ErrorAction SilentlyContinue) {
-            py "-$v" -c "import sys" 2>$null
-            if ($LASTEXITCODE -eq 0) { return @("py", "-$v") }
+            $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            py "-$v" -c "import sys" 2>&1 | Out-Null
+            $code = $LASTEXITCODE; $ErrorActionPreference = $prev
+            if ($code -eq 0) { return @("py", "-$v") }
         }
     }
     return $null
