@@ -89,23 +89,42 @@ function Find-Py {
     return $null
 }
 $BasePy = Find-Py
+if (-not $BasePy -and (Get-Command py -ErrorAction SilentlyContinue)) {
+    # Python install manager mới (py install ...) — máy đang có 3.15 qua công cụ này.
+    Warn "Chưa có Python 3.10-3.13, tự cài Python 3.12 bằng 'py install 3.12'..."
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    py install 3.12
+    $ErrorActionPreference = $prev
+    $BasePy = Find-Py
+}
 if (-not $BasePy -and (Get-Command winget -ErrorAction SilentlyContinue)) {
-    Warn "Chưa có Python 3.10-3.13, tự cài Python 3.12 bằng winget..."
+    Warn "Tự cài Python 3.12 bằng winget..."
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     winget install -e --id Python.Python.3.12 --scope user --accept-package-agreements --accept-source-agreements
+    $ErrorActionPreference = $prev
     $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
     $BasePy = Find-Py
 }
 if (-not $BasePy) {
-    Fail "Cần Python 3.10-3.13 (khuyên 3.12): https://www.python.org/downloads/release/python-3120/ rồi chạy lại. Python 3.14+ chưa có wheel PyYAML."
+    Fail "Cần Python 3.10-3.13 (khuyên 3.12). Chạy 'py install 3.12' hoặc tải https://www.python.org/downloads/release/python-3120/ rồi chạy lại."
 }
+Ok "Dùng Python $($BasePy -join ' ')"
 $Venv = Join-Path $Root ".venv"
 $VenvPy = Join-Path $Venv "Scripts\python.exe"
+# venv cũ tạo bằng Python 3.14+ thì tạo lại
+if (Test-Path $VenvPy) {
+    $minor = & $VenvPy -c "import sys; print(sys.version_info[1])"
+    if ([int]$minor -ge 14 -or [int]$minor -lt 10) { Remove-Item $Venv -Recurse -Force }
+}
 if (-not (Test-Path $VenvPy)) {
-    & $BasePy[0] $BasePy[1..($BasePy.Count)] -m venv $Venv
+    & $BasePy[0] $BasePy[1] -m venv $Venv
     if ($LASTEXITCODE -ne 0) { Fail "Không tạo được venv $Venv" }
 }
-& $VenvPy -m pip install --quiet --prefer-binary --upgrade esptool pyserial
-if ($LASTEXITCODE -ne 0) { Fail "Cài esptool lỗi. Cài Python 3.12 (https://www.python.org/downloads/release/python-3120/) rồi xoá thư mục $Venv và chạy lại." }
+$prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+& $VenvPy -m pip install --quiet --disable-pip-version-check --only-binary pyyaml --upgrade esptool pyserial
+$code = $LASTEXITCODE; $ErrorActionPreference = $prev
+if ($code -ne 0) { Fail "Cài esptool lỗi. Xoá thư mục $Venv rồi chạy lại." }
+Ok "Đã cài esptool"
 $File = if ($Flash -eq "hwtest") { $HwBin } else { $FwBin }
 if (-not (Test-Path $File)) { Fail "Không có file $File" }
 
