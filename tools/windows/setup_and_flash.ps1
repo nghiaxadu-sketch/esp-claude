@@ -77,16 +77,24 @@ if ($Flash -eq "none") { Ok "Xong (không nạp)."; exit 0 }
 
 # 3. Nạp
 # Python quá mới (3.14+) chưa có wheel PyYAML -> pip đòi MSVC. Ưu tiên 3.13/3.12/3.11/3.10 qua py launcher, cài vào venv riêng.
-$BasePy = $null
-foreach ($v in "3.13", "3.12", "3.11", "3.10") {
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        py "-$v" -c "import sys" 2>$null
-        if ($LASTEXITCODE -eq 0) { $BasePy = @("py", "-$v"); break }
+function Find-Py {
+    foreach ($v in "3.13", "3.12", "3.11", "3.10") {
+        if (Get-Command py -ErrorAction SilentlyContinue) {
+            py "-$v" -c "import sys" 2>$null
+            if ($LASTEXITCODE -eq 0) { return @("py", "-$v") }
+        }
     }
+    return $null
+}
+$BasePy = Find-Py
+if (-not $BasePy -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Warn "Chưa có Python 3.10-3.13, tự cài Python 3.12 bằng winget..."
+    winget install -e --id Python.Python.3.12 --scope user --accept-package-agreements --accept-source-agreements
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+    $BasePy = Find-Py
 }
 if (-not $BasePy) {
-    Warn "Không thấy Python 3.10-3.13, dùng 'python' mặc định (nếu là 3.14+ có thể lỗi build PyYAML -> cài Python 3.12)."
-    $BasePy = @("python")
+    Fail "Cần Python 3.10-3.13 (khuyên 3.12): https://www.python.org/downloads/release/python-3120/ rồi chạy lại. Python 3.14+ chưa có wheel PyYAML."
 }
 $Venv = Join-Path $Root ".venv"
 $VenvPy = Join-Path $Venv "Scripts\python.exe"
