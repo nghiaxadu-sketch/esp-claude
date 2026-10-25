@@ -1,0 +1,97 @@
+name: Build ESP-Claude
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test backend Claude (chạy trên máy CI, không cần board)
+        working-directory: components/claw_modules/claw_core
+        run: |
+          curl -sSfLO https://raw.githubusercontent.com/DaveGamble/cJSON/v1.7.18/cJSON.c
+          curl -sSfLO https://raw.githubusercontent.com/DaveGamble/cJSON/v1.7.18/cJSON.h
+          gcc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function \
+            -I. -Isrc -Iinclude -I../claw_endpoint/include -I../claw_endpoint/test_host/include \
+            -o test_anthropic test_host/test_anthropic_backend.c cJSON.c
+          ./test_anthropic
+
+  firmware:
+    needs: host-test
+    runs-on: ubuntu-latest
+    container: espressif/idf:release-v5.5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Màn AMOLED 2.16" 480x480 – gần giống ESP-Mosaico nhất
+          - board: waveshare_ESP32_S3_Touch_AMOLED_2_16
+            brand: waveshare
+          # Board ESP32-S3 rẻ, phổ biến
+          - board: esp32_S3_DevKitC_1
+            brand: espressif
+    defaults:
+      run:
+        shell: bash
+        working-directory: application/edge_agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Địa chỉ cập nhật OTA (file app của chính board này trong release)
+        run: |
+          echo 'CONFIG_EDGE_OTA_DEFAULT_URL="https://github.com/${{ github.repository }}/releases/download/esp-claude-latest/esp-claude-${{ matrix.board }}-app.bin"' >> sdkconfig.defaults
+
+      - name: Sinh cấu hình board
+        run: |
+          . "$IDF_PATH/export.sh"
+          pip install esp-bmgr-assist
+          idf.py bmgr -c ./boards/${{ matrix.brand }} -b ${{ matrix.board }}
+
+      - name: Build firmware
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py build
+
+      - name: Gộp thành 1 file .bin (nạp ở địa chỉ 0x0)
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py merge-bin -o esp-claude-${{ matrix.board }}.bin
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp build/esp-claude-${{ matrix.board }}.bin "$GITHUB_WORKSPACE/out/"
+          # File chỉ chứa app, dùng cho cập nhật qua Wi-Fi
+          cp build/edge_agent.bin "$GITHUB_WORKSPACE/out/esp-claude-${{ matrix.board }}-app.bin"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp-claude-${{ matrix.board }}
+          path: out/*.bin
+
+  release:
+    needs: firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: esp-claude-latest
+          name: ESP-Claude (bản build mới nhất)
+          prerelease: true
+          make_latest: false
+          body: |
+            Firmware ESP-Claude (ESP-Claw chạy Claude). Mỗi board có 2 file:
+            - `esp-claude-<board>.bin`: bản đầy đủ, nạp qua USB ở địa chỉ **0x0**.
+            - `esp-claude-<board>-app.bin`: chỉ phần app, dùng cho nút "Update Firmware" trên trang web của máy (cập nhật qua Wi-Fi).
+            Nạp bằng trình duyệt: https://espressif.github.io/esptool-js/ → Connect → Flash Address `0x0` → chọn file → Program.
+            Build từ commit ${{ github.sha }}.
+          files: out/*.bin

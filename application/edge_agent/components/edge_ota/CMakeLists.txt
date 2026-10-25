@@ -1,0 +1,17 @@
+idf_component_register(
+    SRCS
+        "edge_ota.c"
+        "cmd_ota.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_REQUIRES
+        app_update
+        esp_app_format
+        esp_http_client
+        esp_https_ota
+        esp-tls
+        mbedtls
+        console
+        freertos
+        log
+)

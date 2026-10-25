@@ -1,0 +1,10 @@
+menu "Edge OTA"
+
+    config EDGE_OTA_DEFAULT_URL
+        string "Default firmware URL for over-the-air update"
+        default ""
+        help
+            HTTPS URL of the app-only image (edge_agent.bin). The CI workflow fills this in
+            with the GitHub release asset of the board. Leave empty to require --url.
+
+endmenu
