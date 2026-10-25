@@ -23,20 +23,31 @@ jobs:
             -o test_anthropic test_host/test_anthropic_backend.c cJSON.c
           ./test_anthropic
 
+      - name: Chạy thử các app Lua trên launcher (module giả lập)
+        run: |
+          pip install lupa
+          python3 tools/app_mock_test/run_apps.py application/edge_agent/fatfs_image/system/apps
+
   firmware:
     needs: host-test
     runs-on: ubuntu-latest
-    container: espressif/idf:release-v5.5
+    container: espressif/idf:${{ matrix.idf }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # ESP-Mosaico V1.2 của anh Nghĩa (chip ESP32-S31, cần IDF 6.1)
+          - board: esp_mosaico_v1_2
+            brand: espressif
+            idf: release-v6.1
           # Màn AMOLED 2.16" 480x480 – gần giống ESP-Mosaico nhất
           - board: waveshare_ESP32_S3_Touch_AMOLED_2_16
             brand: waveshare
+            idf: release-v5.5
           # Board ESP32-S3 rẻ, phổ biến
           - board: esp32_S3_DevKitC_1
             brand: espressif
+            idf: release-v5.5
     defaults:
       run:
         shell: bash

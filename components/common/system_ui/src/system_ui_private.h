@@ -39,6 +39,7 @@ extern "C" {
 #define SYSTEM_UI_LAUNCHER_TITLE_LEN 40
 #define SYSTEM_UI_LAUNCHER_ARGS_LEN 384
 #define SYSTEM_UI_LAUNCHER_MAX_TILES 16
+#define SYSTEM_UI_HOME_BAR_MAX_COLS 24
 #define SYSTEM_UI_JOBS_MAX_ITEMS 8
 #define SYSTEM_UI_EVENT_QUEUE_LEN 12
 
@@ -67,6 +68,8 @@ typedef system_ui_tasks_stop_all_cb_t system_ui_jobs_stop_all_cb_t;
 #define SYSTEM_UI_COLOR_MUTED 0x3c4350
 #define SYSTEM_UI_COLOR_BUTTON_BG 0x0d0f14
 #define SYSTEM_UI_COLOR_BUTTON_TEXT 0xf2f4f8
+#define SYSTEM_UI_COLOR_ACCENT 0x0d0f14
+#define SYSTEM_UI_COLOR_BAR 0x9aa2b0
 #else
 #define SYSTEM_UI_COLOR_BG 0x0d0f14
 #define SYSTEM_UI_COLOR_SURFACE 0x161a24
@@ -77,6 +80,8 @@ typedef system_ui_tasks_stop_all_cb_t system_ui_jobs_stop_all_cb_t;
 #define SYSTEM_UI_COLOR_MUTED 0x9aa2b0
 #define SYSTEM_UI_COLOR_BUTTON_BG 0xf2f4f8
 #define SYSTEM_UI_COLOR_BUTTON_TEXT 0x0d0f14
+#define SYSTEM_UI_COLOR_ACCENT 0xe53935
+#define SYSTEM_UI_COLOR_BAR 0x4a5260
 #endif
 
 static inline lv_color_t system_ui_color(uint32_t hex)
@@ -185,6 +190,15 @@ typedef struct {
     lv_obj_t *status_label;
     lv_obj_t *time_label;
     lv_obj_t *date_label;
+    lv_obj_t *weekday_label;
+    lv_obj_t *weather_label;
+    lv_obj_t *hint_label;
+    lv_obj_t *home_bars[SYSTEM_UI_HOME_BAR_MAX_COLS];
+    uint8_t home_bar_count;
+    int32_t home_bar_cell;
+    int32_t home_bar_max_h;
+    int32_t home_bar_bottom;
+    uint32_t home_tick;
     lv_timer_t *home_clock_timer;
     lv_obj_t *overlay_root;
     lv_obj_t *overlay_dot;

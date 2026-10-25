@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "music",
+  "entry": "scripts/music.lua",
+  "display_name": "Music",
+  "icon": "assets/icon.jpg",
+  "args": {},
+  "order": 7,
+  "visible": true
+}

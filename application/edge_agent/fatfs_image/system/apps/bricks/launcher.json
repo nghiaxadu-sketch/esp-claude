@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "bricks",
+  "entry": "scripts/bricks.lua",
+  "display_name": "Bricks",
+  "icon": "assets/icon.jpg",
+  "args": {},
+  "order": 8,
+  "visible": true
+}

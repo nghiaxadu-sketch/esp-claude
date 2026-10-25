@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "weather",
+  "entry": "scripts/weather.lua",
+  "display_name": "Weather",
+  "icon": "assets/icon.jpg",
+  "args": {
+    "city": "Hai Phong",
+    "lat": 20.8449,
+    "lon": 106.6881,
+    "refresh_min": 15
+  },
+  "order": 3,
+  "visible": true
+}

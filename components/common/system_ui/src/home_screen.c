@@ -6,13 +6,20 @@
 #include "system_ui_private.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
+#include "claw_paths.h"
 #include "display_service.h"
 #include "esp_check.h"
 
-#define SYSTEM_UI_HOME_CLOCK_CENTER_PCT 45
-#define SYSTEM_UI_HOME_DATE_Y_PCT 56
+#define SYSTEM_UI_HOME_CLOCK_CENTER_PCT 40
+#define SYSTEM_UI_HOME_WEATHER_Y_PCT 56
+#define SYSTEM_UI_HOME_BARS_TOP_PCT 64
+#define SYSTEM_UI_HOME_WEATHER_REFRESH_S 30
+#define SYSTEM_UI_HOME_WEATHER_FILE "cache/weather/home.txt"
+#define SYSTEM_UI_HOME_WEATHER_LEN 64
+#define SYSTEM_UI_HOME_HINT_TEXT "Swipe left for apps  >"
 
 typedef struct {
     int32_t pad;
@@ -22,6 +29,10 @@ typedef struct {
     int32_t clock_w;
     int32_t clock_h;
     int32_t date_y;
+    int32_t weather_y;
+    int32_t bars_y;
+    int32_t bars_h;
+    int32_t hint_y;
 } system_ui_home_layout_t;
 
 static system_ui_home_layout_t system_ui_home_layout(void)
@@ -34,17 +45,72 @@ static system_ui_home_layout_t system_ui_home_layout(void)
     int32_t clock_h = system_ui_clamp_i32(height * 30 / 100, 68, 118);
     int32_t clock_w = system_ui_clamp_i32(width - system_ui_clamp_i32(short_side / 8, 28, 64), 176, 380);
     int32_t clock_center_y = system_ui_clamp_i32(height * SYSTEM_UI_HOME_CLOCK_CENTER_PCT / 100, clock_h / 2 + 64, height - 48);
-    int32_t date_y = system_ui_clamp_i32(height * SYSTEM_UI_HOME_DATE_Y_PCT / 100, clock_center_y + clock_h / 2 + 4, height - 42);
+    int32_t line_h = system_ui_clamp_i32(short_side / 14, 18, 30);
+    int32_t clock_y = clock_center_y - clock_h / 2;
+    int32_t weather_y = system_ui_clamp_i32(height * SYSTEM_UI_HOME_WEATHER_Y_PCT / 100, clock_y + clock_h + 2, height - 42);
+    int32_t hint_y = height - line_h - header_y;
+    int32_t bars_y = system_ui_max_i32(weather_y + line_h + 6, height * SYSTEM_UI_HOME_BARS_TOP_PCT / 100);
 
     return (system_ui_home_layout_t) {
         .pad = system_ui_clamp_i32(short_side / 16, 14, 30),
         .header_y = header_y,
         .status_h = status_h,
-        .clock_y = clock_center_y - clock_h / 2,
+        .clock_y = clock_y,
         .clock_w = clock_w,
         .clock_h = clock_h,
-        .date_y = date_y,
+        .date_y = system_ui_max_i32(header_y + status_h, clock_y - line_h),
+        .weather_y = weather_y,
+        .bars_y = bars_y,
+        .bars_h = system_ui_max_i32(0, hint_y - bars_y - 4),
+        .hint_y = hint_y,
     };
+}
+
+/* Weather summary written by the Weather app; empty when the app has never fetched data. */
+static void system_ui_home_update_weather_locked(void)
+{
+    char path[SYSTEM_UI_PATH_MAX];
+    char text[SYSTEM_UI_HOME_WEATHER_LEN] = "";
+
+    if (!s_ui.weather_label) {
+        return;
+    }
+    if (claw_paths_join(CLAW_PATH_DATA, SYSTEM_UI_HOME_WEATHER_FILE, path, sizeof(path)) == ESP_OK) {
+        FILE *file = fopen(path, "r");
+        if (file) {
+            if (!fgets(text, sizeof(text), file)) {
+                text[0] = '\0';
+            }
+            fclose(file);
+            text[strcspn(text, "\r\n")] = '\0';
+        }
+    }
+    lv_label_set_text(s_ui.weather_label, text);
+}
+
+/* Slowly scrolling pixel skyline under the clock, one column per bar object. */
+static void system_ui_home_update_bars_locked(void)
+{
+    static const uint8_t pattern[] = { 2, 3, 5, 4, 6, 7, 5, 3, 2, 4, 6, 8, 7, 5, 4, 3, 5, 6, 4, 2 };
+    const size_t pattern_len = sizeof(pattern) / sizeof(pattern[0]);
+    int32_t step = s_ui.home_bar_cell + 2;
+
+    if (step <= 2 || s_ui.home_bar_max_h <= 0) {
+        return;
+    }
+    int32_t max_cells = s_ui.home_bar_max_h / step;
+    for (uint8_t i = 0; i < s_ui.home_bar_count; i++) {
+        lv_obj_t *bar = s_ui.home_bars[i];
+        if (!bar) {
+            continue;
+        }
+        int32_t cells = pattern[(i + s_ui.home_tick / 2) % pattern_len] * max_cells / 8;
+        cells = system_ui_clamp_i32(cells, 1, system_ui_max_i32(1, max_cells));
+        /* Bars grow upwards from a shared baseline. */
+        int32_t bar_h = cells * step - 2;
+        lv_obj_set_y(bar, s_ui.home_bar_bottom - bar_h);
+        lv_obj_set_height(bar, bar_h);
+    }
 }
 
 static void system_ui_home_update_clock_locked(void)
@@ -53,13 +119,16 @@ static void system_ui_home_update_clock_locked(void)
     struct tm tm_now = {0};
     char time_text[16];
     char date_text[32];
+    char weekday_text[16];
 
     if (now > 0 && localtime_r(&now, &tm_now)) {
         strftime(time_text, sizeof(time_text), "%H:%M", &tm_now);
-        strftime(date_text, sizeof(date_text), "%a, %d %b", &tm_now);
+        strftime(date_text, sizeof(date_text), "%m/%d \xC2\xB7 ", &tm_now);
+        strftime(weekday_text, sizeof(weekday_text), "%a", &tm_now);
     } else {
         snprintf(time_text, sizeof(time_text), "--:--");
-        snprintf(date_text, sizeof(date_text), "---  --.--");
+        snprintf(date_text, sizeof(date_text), "--/-- \xC2\xB7 ");
+        snprintf(weekday_text, sizeof(weekday_text), "---");
     }
 
     if (s_ui.time_label) {
@@ -68,12 +137,20 @@ static void system_ui_home_update_clock_locked(void)
     if (s_ui.date_label) {
         lv_label_set_text(s_ui.date_label, date_text);
     }
+    if (s_ui.weekday_label) {
+        lv_label_set_text(s_ui.weekday_label, weekday_text);
+    }
 }
 
 static void system_ui_home_clock_timer_cb(lv_timer_t *timer)
 {
     (void)timer;
+    s_ui.home_tick++;
     system_ui_home_update_clock_locked();
+    system_ui_home_update_bars_locked();
+    if (s_ui.home_tick % SYSTEM_UI_HOME_WEATHER_REFRESH_S == 0) {
+        system_ui_home_update_weather_locked();
+    }
 }
 
 void system_ui_home_update_locked(void)
@@ -121,6 +198,66 @@ static esp_err_t system_ui_home_create_status_bar_locked(const system_ui_home_la
     return ESP_OK;
 }
 
+static esp_err_t system_ui_home_create_date_row_locked(const system_ui_home_layout_t *layout)
+{
+    lv_obj_t *row = lv_obj_create(s_ui.home_tile);
+    ESP_RETURN_ON_FALSE(row != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create date row failed");
+    lv_obj_set_size(row, layout->clock_w, LV_SIZE_CONTENT);
+    lv_obj_align(row, LV_ALIGN_TOP_MID, 0, layout->date_y);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_ui.date_label = lv_label_create(row);
+    ESP_RETURN_ON_FALSE(s_ui.date_label != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create date failed");
+    lv_obj_set_style_text_color(s_ui.date_label, system_ui_color(SYSTEM_UI_COLOR_TEXT), 0);
+    system_ui_apply_font(s_ui.date_label);
+
+    /* The weekday is highlighted in the accent color, like a watch face. */
+    s_ui.weekday_label = lv_label_create(row);
+    ESP_RETURN_ON_FALSE(s_ui.weekday_label != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create weekday failed");
+    lv_obj_set_style_text_color(s_ui.weekday_label, system_ui_color(SYSTEM_UI_COLOR_ACCENT), 0);
+    system_ui_apply_font(s_ui.weekday_label);
+    return ESP_OK;
+}
+
+static esp_err_t system_ui_home_create_bars_locked(const system_ui_home_layout_t *layout)
+{
+    int32_t short_side = system_ui_short_side_from(s_ui.width, s_ui.height);
+    int32_t cell = system_ui_clamp_i32(short_side / 22, 6, 22);
+    int32_t step = cell + 2;
+    int32_t avail_w = (int32_t)s_ui.width - layout->pad * 2;
+    int32_t cols = system_ui_clamp_i32(avail_w / step, 0, SYSTEM_UI_HOME_BAR_MAX_COLS);
+
+    s_ui.home_bar_count = 0;
+    s_ui.home_bar_cell = cell;
+    s_ui.home_bar_max_h = layout->bars_h;
+    s_ui.home_bar_bottom = layout->bars_y + layout->bars_h;
+    if (layout->bars_h < step * 2 || cols <= 0) {
+        return ESP_OK;
+    }
+    int32_t x0 = ((int32_t)s_ui.width - cols * step + 2) / 2;
+    int32_t bottom = s_ui.home_bar_bottom;
+    for (int32_t i = 0; i < cols; i++) {
+        lv_obj_t *bar = lv_obj_create(s_ui.home_tile);
+        ESP_RETURN_ON_FALSE(bar != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create home bar failed");
+        lv_obj_set_size(bar, cell, cell);
+        lv_obj_set_style_radius(bar, 2, 0);
+        lv_obj_set_style_bg_color(bar, system_ui_color(SYSTEM_UI_COLOR_BAR), 0);
+        lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(bar, 0, 0);
+        lv_obj_set_style_pad_all(bar, 0, 0);
+        lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_pos(bar, x0 + i * step, bottom - cell);
+        s_ui.home_bars[s_ui.home_bar_count++] = bar;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t system_ui_create_home_tile_locked(void)
 {
     system_ui_home_layout_t layout = system_ui_home_layout();
@@ -147,17 +284,34 @@ static esp_err_t system_ui_create_home_tile_locked(void)
     system_ui_apply_clock_font(s_ui.time_label);
     lv_obj_align(s_ui.time_label, LV_ALIGN_TOP_MID, 0, layout.clock_y);
 
-    s_ui.date_label = lv_label_create(s_ui.home_tile);
-    ESP_RETURN_ON_FALSE(s_ui.date_label != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create date failed");
-    lv_obj_set_width(s_ui.date_label, layout.clock_w);
-    lv_obj_set_style_text_color(s_ui.date_label, system_ui_color(SYSTEM_UI_COLOR_MUTED), 0);
-    lv_obj_set_style_text_align(s_ui.date_label, LV_TEXT_ALIGN_CENTER, 0);
-    system_ui_apply_font(s_ui.date_label);
-    lv_obj_align(s_ui.date_label, LV_ALIGN_TOP_MID, 0, layout.date_y);
+    ESP_RETURN_ON_ERROR(system_ui_home_create_date_row_locked(&layout), SYSTEM_UI_TAG, "create date row failed");
+
+    s_ui.weather_label = lv_label_create(s_ui.home_tile);
+    ESP_RETURN_ON_FALSE(s_ui.weather_label != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create weather failed");
+    lv_obj_set_width(s_ui.weather_label, layout.clock_w);
+    lv_label_set_long_mode(s_ui.weather_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(s_ui.weather_label, system_ui_color(SYSTEM_UI_COLOR_MUTED), 0);
+    lv_obj_set_style_text_align(s_ui.weather_label, LV_TEXT_ALIGN_CENTER, 0);
+    system_ui_apply_font(s_ui.weather_label);
+    lv_obj_align(s_ui.weather_label, LV_ALIGN_TOP_MID, 0, layout.weather_y);
+    lv_label_set_text(s_ui.weather_label, "");
+
+    ESP_RETURN_ON_ERROR(system_ui_home_create_bars_locked(&layout), SYSTEM_UI_TAG, "create bars failed");
+
+    if (s_ui.launcher_app_count > 0) {
+        s_ui.hint_label = lv_label_create(s_ui.home_tile);
+        ESP_RETURN_ON_FALSE(s_ui.hint_label != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create hint failed");
+        lv_label_set_text(s_ui.hint_label, SYSTEM_UI_HOME_HINT_TEXT);
+        lv_obj_set_style_text_color(s_ui.hint_label, system_ui_color(SYSTEM_UI_COLOR_FAINT), 0);
+        system_ui_apply_font(s_ui.hint_label);
+        lv_obj_align(s_ui.hint_label, LV_ALIGN_TOP_MID, 0, layout.hint_y);
+    }
 
     s_ui.home_clock_timer = lv_timer_create(system_ui_home_clock_timer_cb, 1000, NULL);
     ESP_RETURN_ON_FALSE(s_ui.home_clock_timer != NULL, ESP_ERR_NO_MEM, SYSTEM_UI_TAG, "create home clock timer failed");
     system_ui_home_update_locked();
+    system_ui_home_update_weather_locked();
+    system_ui_home_update_bars_locked();
     return ESP_OK;
 }
 
@@ -240,6 +394,11 @@ void system_ui_delete_home_locked(void)
     s_ui.status_label = NULL;
     s_ui.time_label = NULL;
     s_ui.date_label = NULL;
+    s_ui.weekday_label = NULL;
+    s_ui.weather_label = NULL;
+    s_ui.hint_label = NULL;
+    memset(s_ui.home_bars, 0, sizeof(s_ui.home_bars));
+    s_ui.home_bar_count = 0;
 }
 
 esp_err_t system_ui_set_network_status(bool sta_connected, const char *ap_ssid)

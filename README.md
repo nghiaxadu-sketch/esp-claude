@@ -29,10 +29,40 @@ File đã sửa: `components/claw_modules/claw_core/src/llm/backends/claw_llm_ba
 `components/claw_capabilities/cap_llm_config/src/cap_llm_config.c`, 2 trang `LlmPage.tsx` /
 `SetupWizardPage.tsx` (kèm `dist/index.html.gz` build lại), cùng test `claw_core/test_host/test_anthropic_backend.c`.
 
+## Launcher gộp app
+
+Bật máy là vào màn hình Home: ngày + thứ (đỏ), đồng hồ lớn, dòng thời tiết, cột pixel. Vuốt sang trái ra lưới app,
+chạm icon để mở, nút `<` để thoát.
+
+| App | Làm gì |
+|---|---|
+| Camera | Xem trước, chụp ảnh lưu `/photos` |
+| CLAW | Địa chỉ web của máy để chat với Claude, tạo app mới |
+| Weather | Thời tiết + 3 ngày (Open-Meteo, mặc định Hải Phòng, sửa ở `weather/launcher.json`) |
+| Settings | Wi-Fi, IP, RAM, bộ nhớ, âm lượng |
+| IMU | Viên bi lăn theo độ nghiêng |
+| Album / Music | Xem ảnh `/photos`, phát nhạc `/music` |
+| Bricks | Game phá gạch |
+| Dino, Flappy Bird, App Store | Có sẵn từ ESP-Claw |
+
+App nằm ở `application/edge_agent/fatfs_image/system/apps/<id>/`. Sửa xong chạy thử không cần board:
+`pip install lupa && python3 tools/app_mock_test/run_apps.py application/edge_agent/fatfs_image/system/apps`.
+Font máy không có dấu tiếng Việt và ký hiệu °, nên chữ trên màn hình là tiếng Anh không dấu.
+
+## ESP-Mosaico V1.2
+
+- Board `application/edge_agent/boards/espressif/esp_mosaico_v1_2/`, port từ board chính thức `espressif/esp_boards`
+  (bản V1.2). Board V1.0 dùng chân khác, không dùng file này.
+- Nạp lần đầu: tắt máy → giữ **BOOT** → nhấn **POWER** → esptool-js Connect → `esp-claude-esp_mosaico_v1_2.bin` ở `0x0`.
+- Log và dòng lệnh qua cổng Type-C (TinyUSB CDC). Cập nhật qua Wi-Fi (OTA) dùng được vì flash 16MB.
+- Cần xác nhận trên máy thật: hướng màn hình (lệnh `0x36` trong `setup_device.c`) và hướng cảm ứng.
+  Camera module chưa bật.
+
 ## Phần cứng nên mua
 
 | Board | Ghi chú |
 |---|---|
+| **ESP-Mosaico V1.2** (board của anh) | ESP32-S31, màn AMOLED 480×480, IMU, loa, motor rung. Board `esp_mosaico_v1_2`, có OTA |
 | **Waveshare ESP32-S3-Touch-AMOLED-2.16** | Màn 2.16" 480×480, giống ESP-Mosaico nhất |
 | **ESP32-S3-DevKitC-1 (8MB)** | Rẻ nhất, không có màn hình, chat qua web hoặc Telegram. Không có OTA |
 

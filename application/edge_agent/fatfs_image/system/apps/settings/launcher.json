@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "settings",
+  "entry": "scripts/settings.lua",
+  "display_name": "Settings",
+  "icon": "assets/icon.jpg",
+  "args": {},
+  "order": 4,
+  "visible": true
+}

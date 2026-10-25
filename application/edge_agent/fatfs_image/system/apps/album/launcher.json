@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "album",
+  "entry": "scripts/album.lua",
+  "display_name": "Album",
+  "icon": "assets/icon.jpg",
+  "args": {},
+  "order": 6,
+  "visible": true
+}

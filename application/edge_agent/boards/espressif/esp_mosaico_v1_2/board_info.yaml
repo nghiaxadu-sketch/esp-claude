@@ -1,0 +1,5 @@
+board: esp_mosaico_v1_2
+chip: esp32s31
+version: 1.0.0
+description: "ESP-Mosaico V1.2 (ESP32-S31NRV16, 480x480 CO5300 AMOLED touch panel)"
+manufacturer: "ESPRESSIF"

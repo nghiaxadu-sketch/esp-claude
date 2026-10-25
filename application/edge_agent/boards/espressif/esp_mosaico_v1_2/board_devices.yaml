@@ -1,0 +1,132 @@
+# Devices Configuration for ESP-Mosaico V1.2
+# Ported from espressif/esp_boards 0.7.0 `esp_mosaico` (V1.2 revision applied).
+version: 1.0.0
+
+devices:
+  # Type-C is USB HS OTG; there is no ROM USB console on that port, so this component
+  # starts a TinyUSB CDC console before app_main (logs + idf.py auto-download reset).
+  - name: usb_hs_console
+    type: custom
+    version: default
+    init_skip: true
+    dependencies:
+      usb_hs_console:
+        path: "${BOARD_PATH}/usb_hs_console"
+
+  # VCC_3V3 rail for the panel and module slots: GPIO60, active-low, soft-started
+  # in setup_device.c (lcd_power_ctrl custom ops).
+  - name: lcd_power_ctrl
+    type: power_ctrl
+    sub_type: custom
+
+  # ES8311 DAC -> NS4150B PA -> speaker
+  - name: audio_dac
+    chip: es8311
+    type: audio_codec
+    version: default
+    config:
+      adc_enabled: false
+      dac_enabled: true
+      dac_max_channel: 1
+      dac_channel_mask: "1"
+      mclk_enabled: true
+    peripherals:
+      - name: gpio_pa_control
+        gain: 7.6               # dB, NS4150B Av = 240k / 100k (board schematic)
+        active_level: 1
+      - name: i2s_audio_out
+      - name: i2c_master
+        address: 0x32           # ES8311 7-bit 0x19 << 1
+        frequency: 400000
+
+  # ES8311 ADC <- on-board microphone
+  - name: audio_adc
+    chip: es8311
+    type: audio_codec
+    version: default
+    config:
+      adc_enabled: true
+      dac_enabled: false
+      adc_max_channel: 1
+      adc_channel_mask: "1"
+    peripherals:
+      - name: i2s_audio_in
+      - name: i2c_master
+        address: 0x32
+        frequency: 400000
+
+  # 480x480 CO5300 AMOLED (QSPI). No backlight GPIO; power comes from lcd_power_ctrl.
+  - name: display_lcd
+    chip: co5300
+    type: display_lcd
+    sub_type: spi
+    power_ctrl_device: lcd_power_ctrl
+    version: default
+    dependencies:
+      esp_lcd_co5300: "*"
+      esp_lcd_panel_io_additions: "^1"
+    config:
+      x_max: 480
+      y_max: 480
+      need_reset: true
+      io_spi_config:
+        cs_gpio_num: 50
+        dc_gpio_num: -1
+        spi_mode: 0
+        lcd_cmd_bits: 32
+        flags:
+          quad_mode: true
+      lcd_panel_config:
+        reset_gpio_num: 44
+        rgb_ele_order: LCD_RGB_ELEMENT_ORDER_RGB
+        bits_per_pixel: 16
+        data_endian: LCD_RGB_DATA_ENDIAN_BIG
+        vendor_config: NULL
+    peripherals:
+      - name: spi_display
+
+  # CST9220 touch (driver covers CST9217/CST9220), INT GPIO6
+  - name: lcd_touch
+    chip: cst9217
+    type: lcd_touch
+    sub_type: i2c
+    version: default
+    dependencies:
+      esp_lcd_touch:
+        version: "*"
+        require: public
+      waveshare/esp_lcd_touch_cst9217: "*"
+    config:
+      io_i2c_config:
+        scl_speed_hz: 400000
+      touch_config:
+        x_max: 480
+        y_max: 480
+        rst_gpio_num: -1
+        int_gpio_num: 6
+    peripherals:
+      - name: i2c_master
+        i2c_addr: [0xB4]
+
+  # BMI270 IMU for the Lua `imu` module (app IMU)
+  - name: imu_sensor
+    chip: bmi270
+    type: custom
+    version: 1.0.0
+    init_skip: true
+    config:
+      i2c_addr: 0x69
+      frequency: 400000
+      int_gpio_num: -1
+      sdo_gpio_num: -1
+    peripherals:
+      - name: i2c_master
+
+  # Vibration motor: system UI pulses it on taps (default_percent = pulse strength)
+  - name: vibration_motor
+    type: ledc_ctrl
+    version: default
+    config:
+      default_percent: 80
+    peripherals:
+      - name: ledc_vibration

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "camera",
+  "entry": "scripts/camera.lua",
+  "display_name": "Camera",
+  "icon": "assets/icon.jpg",
+  "args": {},
+  "order": 1,
+  "visible": true
+}

@@ -420,8 +420,10 @@ esp_err_t app_claw_cli_start(claw_hw_registry_handle_t registry)
     esp_console_dev_usb_cdc_config_t hw_config = ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_console_new_repl_usb_cdc(&hw_config, &repl_config, &repl));
 #else
-    ESP_LOGE(TAG, "No supported console backend is enabled");
-    return ESP_ERR_NOT_SUPPORTED;
+    /* Boards such as ESP-Mosaico route stdio through a board TinyUSB console and leave
+     * the IDF console unset; run without the CLI instead of failing the whole startup. */
+    ESP_LOGW(TAG, "No IDF console backend is enabled, CLI disabled");
+    return ESP_OK;
 #endif
     linenoiseSetReadFunction(app_claw_cli_read_blocking);
 

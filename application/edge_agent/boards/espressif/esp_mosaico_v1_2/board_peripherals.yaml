@@ -1,0 +1,94 @@
+# Peripherals Configuration for ESP-Mosaico V1.2 (also V1.1, which uses the same pins)
+#
+# Ported from espressif/esp_boards 0.7.0 `esp_mosaico` with board_revision_diff_v1_2.yaml
+# applied, because the Board Manager version used here (0.6.x) has no hardware-revision
+# support. V1.0 boards use different pins (I2C0 on GPIO0/1) and are NOT covered here.
+#
+# Reference: https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s31/esp-mosaico/user_guide.html
+#
+# I2C0 (on-board): CST9220 touch 0x5A, ES8311 0x19, BMI270 0x69, BMM150 0x11/0x12, BQ27220 0x55.
+# I2C1 (module slots): module EEPROMs 0x50 (left) / 0x51 (right).
+version: 1.0.0
+
+peripherals:
+  - name: i2c_master
+    type: i2c
+    role: master
+    config:
+      port: 0
+      pins:
+        sda: 56
+        scl: 3
+
+  - name: i2c_subboard
+    type: i2c
+    role: master
+    config:
+      port: 1
+      pins:
+        sda: 0
+        scl: 1
+
+  # CO5300 AMOLED panel, QSPI on SPI2 (V1.2: SCLK GPIO42, reset GPIO44)
+  - name: spi_display
+    type: spi
+    role: master
+    config:
+      spi_bus_config:
+        spi_port: SPI2_HOST
+        data0_io_num: 36
+        data1_io_num: 51
+        data2_io_num: 35
+        data3_io_num: 9
+        sclk_io_num: 42
+        max_transfer_sz: 460800   # 480 * 480 * RGB565
+
+  # ES8311 I2S: MCLK=54 BCLK=37 WS=49 DOUT=52 DIN=40
+  - name: i2s_audio_out
+    type: i2s
+    role: master
+    format: std-out
+    config: &i2s_config
+      port: 0
+      sample_rate_hz: 16000
+      mclk_multiple: 256
+      data_bit_width: 16
+      slot_bit_width: I2S_SLOT_BIT_WIDTH_AUTO
+      slot_mode: I2S_SLOT_MODE_STEREO
+      slot_mask: I2S_STD_SLOT_BOTH
+      ws_width: 16
+      pins:
+        mclk: 54
+        bclk: 37
+        ws: 49
+        dout: 52
+        din: 40
+
+  - name: i2s_audio_in
+    type: i2s
+    role: master
+    format: std-in
+    config: *i2s_config
+
+  # NS4150B PA enable (active-high)
+  - name: gpio_pa_control
+    type: gpio
+    role: io
+    config:
+      pin: 45
+      mode: GPIO_MODE_OUTPUT
+      default_level: 1
+
+  # Vibration motor driver (active-high), PWM so the UI can pulse it
+  - name: ledc_vibration
+    type: ledc
+    role: none
+    config:
+      gpio_num: 8
+      freq_hz: 1000
+      duty: 0
+      duty_resolution: LEDC_TIMER_10_BIT
+      output_invert: false
+
+  # Not modeled: BMM150 x2, BQ27220 fuel gauge (plain I2C devices on i2c_master),
+  # SPI NAND, module-slot cameras, POWER switch GPIO57 (power path, do not drive).
