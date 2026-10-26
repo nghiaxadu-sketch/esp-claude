@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 #include "app_store.h"
+#include "board_pins.h"
 #include "config.h"
 
 namespace web_portal {
