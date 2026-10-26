@@ -7,8 +7,8 @@ Sketch tự nhận board theo mục **Tools → Board** (xem `board_pins.h`):
 
 | Board thật | Chọn trong Arduino IDE | Màn hình |
 |---|---|---|
-| **CYD ESP32-2432S028R** (ESP32 thường, 1 cổng micro-USB) | **ESP32 Dev Module** | ILI9341 |
-| CYD ESP32-2432S028R bản "2USB" (micro-USB + USB-C) | **ESP32 Dev Module**, đặt `CYD_DISPLAY_ST7789 1` trong `config.h` | ST7789 |
+| **CYD ESP32-2432S028R bản mới** (có cổng USB-C) | **ESP32 Dev Module** (mặc định) | ST7789 |
+| CYD ESP32-2432S028R bản cũ (chỉ có micro-USB) | **ESP32 Dev Module**, đặt `CYD_DISPLAY_ST7789 0` trong `config.h` | ILI9341 |
 | RockBase-iot NM-CYD-C5 | **ESP32C5 Dev Module** | ST7789 |
 
 Chọn sai loại chip thì lúc nạp sẽ báo lỗi "This chip is ESP32, not ESP32-C5" (hoặc ngược lại). Đổi lại mục Board cho đúng chip là hết.
@@ -88,16 +88,16 @@ Cách khác (không khuyến khích): điền `WIFI_SSID`, `WIFI_PASSWORD`, `ANT
 
 ## Model và chi phí
 
-Mặc định là `claude-opus-5-5` với `effort: low` (nhanh, đủ cho hỏi đáp ngắn), có bật `fallbacks: "default"`
+Mặc định là `claude-sonnet-5-5` với `effort: low` (nhanh, đủ cho hỏi đáp ngắn), có bật `fallbacks: "default"`
 để Claude tự chạy lại bằng model khác nếu bộ lọc an toàn từ chối nhầm.
-Muốn rẻ hơn khoảng 40 lần: `/model claude-haiku-5-5`.
-Giá tham khảo mỗi 1 triệu token (vào / ra): Opus 5.5 là $4 / $20, Haiku 5.5 là $0.10 / $0.50.
+Muốn mạnh hơn: `/model claude-opus-5-5`. Muốn rẻ hơn khoảng 20 lần: `/model claude-haiku-5-5`.
+Giá tham khảo mỗi 1 triệu token (vào / ra): Sonnet 5.5 là $2 / $10, Opus 5.5 là $4 / $20, Haiku 5.5 là $0.10 / $0.50.
 
 ## Chỉnh trong `config.h`
 
 | Hằng số | Ý nghĩa |
 |---|---|
-| `CYD_DISPLAY_ST7789` | Chỉ cho ESP32-2432S028R: `0` = ILI9341, `1` = ST7789 (bản 2USB) |
+| `CYD_DISPLAY_ST7789` | Chỉ cho ESP32-2432S028R: `1` = ST7789 (bản USB-C, mặc định), `0` = ILI9341 (bản micro-USB) |
 | `LCD_ROTATION` | `1` mặc định. Nếu hình bị ngược thì thử `3` |
 | `LCD_INVERT_COLORS` | `-1` theo board, `1` nếu màu bị âm bản, `0` nếu không |
 | `CHAT_TEXT_SIZE` | `1`: 51 ký tự × 17 dòng. `2`: chữ to, 25 ký tự × 9 dòng |
@@ -110,7 +110,8 @@ Giá tham khảo mỗi 1 triệu token (vào / ra): Opus 5.5 là $4 / $20, Haiku
 
 | Hiện tượng | Cách xử lý |
 |---|---|
-| Màn trắng / đen | ESP32-2432S028R: thử đổi `CYD_DISPLAY_ST7789` (0 ↔ 1). Màu âm bản thì đổi `LCD_INVERT_COLORS` |
+| Màu bị đảo, hình dọc bị cắt, dưới có nhiễu | Sai driver màn: đổi `CYD_DISPLAY_ST7789` (1 ↔ 0) rồi nạp lại |
+| Hình quay ngược 180° | Đổi `LCD_ROTATION` thành `3`, rồi gõ `/cal` để hiệu chỉnh lại |
 | Nạp báo sai chip | Chọn lại Tools → Board đúng chip: ESP32 Dev Module hoặc ESP32C5 Dev Module |
 | Chạm lệch | Gõ `/cal` để hiệu chỉnh lại |
 | `Loi mang: ...` | Wi-Fi yếu hoặc chặn HTTPS. Gõ `/status` để xem |

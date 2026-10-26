@@ -31,14 +31,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # CYD ESP32-2432S028R, màn ILI9341 (bản phổ biến, 1 cổng micro-USB)
-          - name: esp32-2432s028r-ili9341
-            fqbn: "esp32:esp32:esp32:PartitionScheme=huge_app"
-            flags: ""
-          # CYD ESP32-2432S028R bản "2USB", màn ST7789
+          # CYD ESP32-2432S028R bản mới có USB-C, màn ST7789 (mặc định)
           - name: esp32-2432s028r-st7789
             fqbn: "esp32:esp32:esp32:PartitionScheme=huge_app"
-            flags: "-DCYD_DISPLAY_ST7789=1"
+            flags: ""
+          # CYD ESP32-2432S028R bản cũ chỉ có micro-USB, màn ILI9341
+          - name: esp32-2432s028r-ili9341
+            fqbn: "esp32:esp32:esp32:PartitionScheme=huge_app"
+            flags: "-DCYD_DISPLAY_ST7789=0"
           # RockBase-iot NM-CYD-C5
           - name: nm_cyd_c5
             fqbn: "esp32:esp32:esp32c5:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=enabled,CDCOnBoot=cdc"

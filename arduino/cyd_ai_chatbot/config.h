@@ -12,7 +12,7 @@
 
 // ---- Claude API ----
 #define ANTHROPIC_API_KEY ""          // https://platform.claude.com/settings/keys
-#define CLAUDE_MODEL "claude-opus-5-5" // cheaper: "claude-haiku-5-5" (or /model over Serial)
+#define CLAUDE_MODEL "claude-sonnet-5-5" // or "claude-opus-5-5" / "claude-haiku-5-5" (or /model over Serial)
 #define CLAUDE_EFFORT "low"            // low | medium | high | xhigh | max ; "" = API default
 #define CLAUDE_MAX_TOKENS 4096         // includes Claude's thinking; replies are kept short by the system prompt
 #define CLAUDE_HTTP_TIMEOUT_MS 60000   // HTTPClient limit is 65535 ms
@@ -26,12 +26,13 @@
 #define TIMEZONE_OFFSET_SECONDS (7 * 3600)  // Vietnam, UTC+7
 
 // ---- Screen ----
-// Only for "ESP32 Dev Module" (ESP32-2432S028R): 0 = ILI9341 (most boards, 1 micro-USB port),
-// 1 = ST7789 (newer "2USB" boards with micro-USB + USB-C). NM-CYD-C5 always uses ST7789.
+// Only for "ESP32 Dev Module" (ESP32-2432S028R): 1 = ST7789 (newer boards with a USB-C port),
+// 0 = ILI9341 (older boards with only micro-USB). Wrong choice: inverted colors and a portrait,
+// cut-off picture with noise at the bottom. NM-CYD-C5 always uses ST7789.
 #ifndef CYD_DISPLAY_ST7789
-#define CYD_DISPLAY_ST7789 0
+#define CYD_DISPLAY_ST7789 1
 #endif
-#define LCD_ROTATION 1          // landscape; try 3 if the picture is upside down
+#define LCD_ROTATION 1          // landscape (320x240); 3 = landscape turned 180 degrees
 #define LCD_INVERT_COLORS -1    // -1 = board default, 0 = normal, 1 = inverted (if colors look like a negative)
 #define LCD_SPI_HZ 40000000
 #define LCD_BRIGHTNESS_PERCENT 80

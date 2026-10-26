@@ -6,7 +6,8 @@
 
 // Maps raw ADC readings to screen pixels. Produced by the 3-point calibration in the sketch.
 struct TouchCalibration {
-    static constexpr uint32_t kMagic = 0x43594431;  // "CYD1"
+    // Bump when the screen geometry changes so boards recalibrate once.
+    static constexpr uint32_t kMagic = 0x43594432;  // "CYD2"
 
     uint32_t magic = 0;
     bool swapXy = false;  // raw Y axis follows screen X
