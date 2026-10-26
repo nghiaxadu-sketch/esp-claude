@@ -34,13 +34,13 @@ jobs:
       matrix:
         include:
           - name: cyd-esp32-2432s028r-st7789
-            fqbn: esp32:esp32:esp32:PartitionScheme=huge_app
+            fqbn: esp32:esp32:esp32:PartitionScheme=default
             flags: ""
           - name: cyd-esp32-2432s028r-ili9341
-            fqbn: esp32:esp32:esp32:PartitionScheme=huge_app
+            fqbn: esp32:esp32:esp32:PartitionScheme=default
             flags: "-DCYD_DISPLAY_ST7789=0"
           - name: nm-cyd-c5
-            fqbn: esp32:esp32:esp32c5:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=enabled,CDCOnBoot=cdc
+            fqbn: esp32:esp32:esp32c5:FlashSize=16M,PSRAM=enabled,CDCOnBoot=cdc
             flags: ""
     steps:
       - uses: actions/checkout@v4
