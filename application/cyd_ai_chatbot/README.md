@@ -44,12 +44,15 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
 
 ## 2. Chọn board (Tools)
 
+> **Bắt buộc đổi Partition Scheme.** Sketch cỡ ~1,4MB, partition mặc định chỉ chứa 1,25MB nên Arduino báo
+> "Sketch too big / text section exceeds available space in board". Chọn đúng bảng dưới đây là hết lỗi.
+
 **CYD ESP32-2432S028R:**
 
 | Mục | Giá trị |
 |---|---|
 | Board | **ESP32 Dev Module** |
-| Partition Scheme | Không cần chọn: file `partitions.csv` trong thư mục sketch tự đặt 3MB cho app + ~900KB lưu app |
+| Partition Scheme | **Huge APP (3MB No OTA/1MB SPIFFS)** (1MB SPIFFS dùng để lưu app) |
 | Upload Speed | 921600 (lỗi thì hạ xuống 115200) |
 
 **NM-CYD-C5:**
@@ -58,11 +61,11 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
 |---|---|
 | Board | **ESP32C5 Dev Module** |
 | Flash Size | **16MB (128Mb)** |
-| Partition Scheme | Không cần chọn (dùng `partitions.csv` như trên; flash còn dư không dùng đến) |
+| Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** (app lưu trên FATFS) |
 | PSRAM | **Enabled** |
 | USB CDC On Boot | **Enabled** (để Serial Monitor chạy qua cổng USB) |
 
-Sketch cỡ 1.4MB nên partition mặc định (1.25MB) không đủ; `partitions.csv` giải quyết việc này. Nếu thấy báo "Sketch too big" thì kiểm tra file `partitions.csv` còn nằm cạnh `cyd_ai_chatbot.ino` không.
+Partition mặc định chỉ có 1.2MB cho app, **không đủ**. Nhớ đổi Partition Scheme.
 
 ## 3. Nạp và cài đặt
 
@@ -132,8 +135,8 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | "App loi: ..." trên màn chính | Giữ tile 1 giây → **Sua**, gõ "sua loi" là đủ: lỗi được gửi kèm cho Claude |
 | `API loi 401` | Sai API key, nhập lại trên trang web hoặc `/key ...` |
 | `API loi 429` / `529` | Quá giới hạn hoặc server bận, đợi một lát |
-| "no file system partition" trong Serial | Thiếu `partitions.csv` cạnh file .ino |
-| "Sketch too big" / "text section exceeds" | Thiếu `partitions.csv` cạnh file .ino (copy cả thư mục `cyd_ai_chatbot`, không chỉ file .ino) |
+| "no file system partition" trong Serial | Chưa chọn Partition Scheme có SPIFFS/FATFS (xem mục 2) |
+| Upload báo "Sketch too big" | Chưa đổi Partition Scheme sang 3MB APP |
 
 ## Cấu trúc code
 
