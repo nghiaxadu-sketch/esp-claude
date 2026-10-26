@@ -77,7 +77,7 @@ const char *prefixFor(Speaker who)
 
 }  // namespace
 
-ChatUi::ChatUi(Adafruit_ST7789 &tft) : tft_(tft)
+ChatUi::ChatUi(Adafruit_GFX &tft) : tft_(tft)
 {
 }
 

@@ -3,7 +3,7 @@ name: Build CYD AI Chatbot (Arduino)
 on:
   push:
     paths:
-      - "arduino/**"
+      - "arduino/cyd_ai_chatbot/**"
       - ".github/workflows/build-cyd-chatbot.yml"
   workflow_dispatch:
 
@@ -12,19 +12,39 @@ permissions:
 
 env:
   ESP32_CORE_VERSION: "3.3.7"
-  FQBN: "esp32:esp32:esp32c5:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=enabled,CDCOnBoot=cdc"
 
 jobs:
-  build:
+  host-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Test bỏ dấu tiếng Việt / ngắt dòng (chạy trên máy CI)
         working-directory: arduino/cyd_ai_chatbot/test
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test
           ./text_utils_test
+
+  build:
+    needs: host-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CYD ESP32-2432S028R, màn ILI9341 (bản phổ biến, 1 cổng micro-USB)
+          - name: esp32-2432s028r-ili9341
+            fqbn: "esp32:esp32:esp32:PartitionScheme=huge_app"
+            flags: ""
+          # CYD ESP32-2432S028R bản "2USB", màn ST7789
+          - name: esp32-2432s028r-st7789
+            fqbn: "esp32:esp32:esp32:PartitionScheme=huge_app"
+            flags: "-DCYD_DISPLAY_ST7789=1"
+          # RockBase-iot NM-CYD-C5
+          - name: nm_cyd_c5
+            fqbn: "esp32:esp32:esp32c5:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=enabled,CDCOnBoot=cdc"
+            flags: ""
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: arduino/setup-arduino-cli@v2
 
@@ -34,45 +54,18 @@ jobs:
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install esp32:esp32@${ESP32_CORE_VERSION}
-          arduino-cli lib install "Adafruit GFX Library" "Adafruit ST7735 and ST7789 Library" "ArduinoJson"
+          arduino-cli lib install "Adafruit GFX Library" "Adafruit ILI9341" "Adafruit ST7735 and ST7789 Library" "ArduinoJson"
 
-      - name: Compile cho NM-CYD-C5 (ESP32-C5)
+      - name: Compile ${{ matrix.name }}
         run: |
-          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
+          arduino-cli compile --fqbn "${{ matrix.fqbn }}" --warnings default --export-binaries \
+            --build-property "compiler.cpp.extra_flags=${{ matrix.flags }}" \
             --output-dir build arduino/cyd_ai_chatbot
           ls -la build
 
-      - name: Compile Wi-Fi Dead Zone Finder
-        run: |
-          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
-            --output-dir build_deadzone arduino/wifi_deadzone_cyd_c5
-
-      - name: Compile Wi-Fi Dead Zone Finder (secrets.h giả chỉ để build)
-        run: |
-          cp arduino/c3_wifi_deadzone_cyd/secrets.h.example arduino/c3_wifi_deadzone_cyd/secrets.h
-          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
-            --output-dir build_deadzone arduino/c3_wifi_deadzone_cyd
-
       - uses: actions/upload-artifact@v4
         with:
-          name: cyd-ai-chatbot-nm_cyd_c5
+          name: cyd-ai-chatbot-${{ matrix.name }}
           path: |
             build/cyd_ai_chatbot.ino.merged.bin
             build/cyd_ai_chatbot.ino.bin
-            build_deadzone/wifi_deadzone_cyd_c5.ino.merged.bin
-
-      - name: Compile Wi-Fi Dead Zone Finder cho NM-CYD-C5
-        run: |
-          cp arduino/c3_wifi_deadzone_cyd/secrets.h.example arduino/c3_wifi_deadzone_cyd/secrets.h
-          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
-            --output-dir build_deadzone arduino/c3_wifi_deadzone_cyd
-          ls -la build_deadzone
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wifi-deadzone-nm_cyd_c5
-          path: build_deadzone/c3_wifi_deadzone_cyd.ino.merged.bin
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cyd-wifi-deadzone-nm_cyd_c5
-          path: build_deadzone/c3_wifi_deadzone_cyd.ino.merged.bin

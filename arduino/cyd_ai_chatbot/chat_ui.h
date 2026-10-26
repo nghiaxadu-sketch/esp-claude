@@ -1,7 +1,7 @@
 // Touch UI for 320x240: a scrollable chat view and an on-screen QWERTY keyboard.
 #pragma once
 
-#include <Adafruit_ST7789.h>
+#include <Adafruit_GFX.h>
 #include <Arduino.h>
 #include <vector>
 
@@ -15,7 +15,7 @@ enum class UiAction : uint8_t {
 
 class ChatUi {
 public:
-    explicit ChatUi(Adafruit_ST7789 &tft);
+    explicit ChatUi(Adafruit_GFX &tft);
 
     void begin();
     void showChat();
@@ -80,7 +80,7 @@ private:
     void scrollToBottom();
     int maxScroll() const;
 
-    Adafruit_ST7789 &tft_;
+    Adafruit_GFX &tft_;
     Screen screen_ = Screen::Chat;
     KeyboardMode mode_ = KeyboardMode::Letters;
     bool shift_ = false;

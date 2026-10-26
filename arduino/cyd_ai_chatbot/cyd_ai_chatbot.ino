@@ -1,12 +1,12 @@
-// CYD AI Chatbot for the RockBase-iot NM-CYD-C5 (ESP32-C5 Cheap Yellow Display).
+// CYD AI Chatbot: ask Claude from a "Cheap Yellow Display" touch screen.
 //
-// Type a question on the touch keyboard (or in the Serial Monitor), the board asks Claude
-// over Wi-Fi and shows the answer on the 2.8" screen. Setup steps: README.md.
-//
-// Arduino IDE: board "ESP32C5 Dev Module" (esp32 core >= 3.3), Flash Size "16MB",
-// Partition Scheme "16M Flash (3MB APP/9.9MB FATFS)", PSRAM "Enabled", USB CDC On Boot "Enabled".
-// Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library", "ArduinoJson" (v7).
-// Settings: config.h. Code: chatbot_app.cpp, chat_ui.cpp, claude_client.cpp, touch_xpt2046.cpp.
+// Supported boards (picked automatically from Tools -> Board, see board_pins.h):
+//   "ESP32 Dev Module"   -> CYD ESP32-2432S028R. Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)".
+//                           Display ILI9341 by default; set CYD_DISPLAY_ST7789 1 in config.h for "2USB" boards.
+//   "ESP32C5 Dev Module" -> RockBase-iot NM-CYD-C5. Flash Size 16MB,
+//                           Partition Scheme "16M Flash (3MB APP/9.9MB FATFS)", PSRAM Enabled, USB CDC On Boot Enabled.
+// Libraries: "Adafruit ILI9341", "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library", "ArduinoJson" (v7).
+// Settings: config.h. Setup steps: README.md.
 
 #include "chatbot_app.h"
 

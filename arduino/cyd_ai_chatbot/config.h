@@ -26,12 +26,17 @@
 #define TIMEZONE_OFFSET_SECONDS (7 * 3600)  // Vietnam, UTC+7
 
 // ---- Screen ----
-#define LCD_ROTATION 1          // 1 = landscape as in ESP-Claw (swap_xy + mirror_y); try 3 if upside down
-#define LCD_INVERT_COLORS false // set true if colors look like a photo negative
+// Only for "ESP32 Dev Module" (ESP32-2432S028R): 0 = ILI9341 (most boards, 1 micro-USB port),
+// 1 = ST7789 (newer "2USB" boards with micro-USB + USB-C). NM-CYD-C5 always uses ST7789.
+#ifndef CYD_DISPLAY_ST7789
+#define CYD_DISPLAY_ST7789 0
+#endif
+#define LCD_ROTATION 1          // landscape; try 3 if the picture is upside down
+#define LCD_INVERT_COLORS -1    // -1 = board default, 0 = normal, 1 = inverted (if colors look like a negative)
 #define LCD_SPI_HZ 40000000
 #define LCD_BRIGHTNESS_PERCENT 80
 #define CHAT_TEXT_SIZE 1        // 1 = 51 chars x 17 lines, 2 = 25 chars x 9 lines
 
 // ---- RGB LED status ----
 #define RGB_LED_ENABLED 1
-#define RGB_LED_LEVEL 24        // 0..255, the WS2812 is very bright
+#define RGB_LED_LEVEL 24        // 0..255, the LEDs are very bright

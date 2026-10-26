@@ -1,5 +1,6 @@
 // Application logic of the CYD AI chatbot (kept out of the .ino so Arduino's prototype generator leaves it alone).
 
+#include <Adafruit_ILI9341.h>
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
 #include <WiFi.h>
@@ -7,9 +8,9 @@
 
 #include "chatbot_app.h"
 #include "board_pins.h"
+#include "config.h"
 #include "chat_ui.h"
 #include "claude_client.h"
-#include "config.h"
 #include "settings_store.h"
 #include "touch_xpt2046.h"
 
@@ -32,8 +33,26 @@ constexpr const char *kNtpServer1 = "pool.ntp.org";
 constexpr const char *kNtpServer2 = "time.google.com";
 constexpr time_t kValidEpoch = 1700000000;  // anything earlier means NTP has not answered yet
 
-Adafruit_ST7789 tft(&SPI, CYD_PIN_LCD_CS, CYD_PIN_LCD_DC, CYD_PIN_LCD_RST);
-TouchXpt2046 touch(SPI, CYD_PIN_TOUCH_CS, kScreenW, kScreenH);
+#if CYD_SHARED_SPI
+SPIClass &lcdSpi = SPI;
+SPIClass &touchSpi = SPI;
+#else
+SPIClass lcdSpiBus(HSPI);  // ESP32-2432S028R: LCD on HSPI, touch on the default (VSPI) bus
+SPIClass &lcdSpi = lcdSpiBus;
+SPIClass &touchSpi = SPI;
+#endif
+
+#if CYD_SHARED_SPI || CYD_DISPLAY_ST7789
+constexpr bool kUseSt7789 = true;
+Adafruit_ST7789 tft(&lcdSpi, CYD_PIN_LCD_CS, CYD_PIN_LCD_DC, CYD_PIN_LCD_RST);
+#else
+constexpr bool kUseSt7789 = false;
+Adafruit_ILI9341 tft(&lcdSpi, CYD_PIN_LCD_DC, CYD_PIN_LCD_CS, CYD_PIN_LCD_RST);
+#endif
+// The "2USB" ESP32-2432S028R ST7789 panels need inversion; ILI9341 and NM-CYD-C5 do not.
+constexpr bool kDefaultInvert = kUseSt7789 && !CYD_SHARED_SPI;
+
+TouchXpt2046 touch(touchSpi, CYD_PIN_TOUCH_CS, kScreenW, kScreenH);
 ChatUi ui(tft);
 ClaudeClient claude;
 AppSettings settings;
@@ -50,9 +69,28 @@ String serialLine;
 void setLed(uint8_t r, uint8_t g, uint8_t b)
 {
 #if RGB_LED_ENABLED
-    rgbLedWrite(CYD_PIN_RGB_LED, (uint16_t)r * RGB_LED_LEVEL / 255, (uint16_t)g * RGB_LED_LEVEL / 255,
-                (uint16_t)b * RGB_LED_LEVEL / 255);
+    const uint8_t rl = (uint16_t)r * RGB_LED_LEVEL / 255;
+    const uint8_t gl = (uint16_t)g * RGB_LED_LEVEL / 255;
+    const uint8_t bl = (uint16_t)b * RGB_LED_LEVEL / 255;
+#if CYD_RGB_WS2812
+    rgbLedWrite(CYD_PIN_RGB_LED, rl, gl, bl);
+#else
+    const uint32_t maxDuty = (1U << RGB_PWM_BITS) - 1;  // LEDs are active low
+    ledcWrite(CYD_PIN_LED_RED, maxDuty - rl);
+    ledcWrite(CYD_PIN_LED_GREEN, maxDuty - gl);
+    ledcWrite(CYD_PIN_LED_BLUE, maxDuty - bl);
 #endif
+#endif
+}
+
+void initLed()
+{
+#if RGB_LED_ENABLED && !CYD_RGB_WS2812
+    for (int8_t pin : {CYD_PIN_LED_RED, CYD_PIN_LED_GREEN, CYD_PIN_LED_BLUE}) {
+        ledcAttach(pin, RGB_PWM_HZ, RGB_PWM_BITS);
+    }
+#endif
+    setLed(0, 0, 0);
 }
 
 void setBacklight(uint8_t percent)
@@ -63,20 +101,27 @@ void setBacklight(uint8_t percent)
 
 void initDisplay()
 {
-    // All devices on the shared bus must be deselected before the first transfer.
+    // Deselect every SPI device before the first transfer.
     for (int8_t cs : {CYD_PIN_LCD_CS, CYD_PIN_TOUCH_CS, CYD_PIN_SD_CS}) {
         pinMode(cs, OUTPUT);
         digitalWrite(cs, HIGH);
     }
-    SPI.begin(CYD_PIN_SPI_SCK, CYD_PIN_SPI_MISO, CYD_PIN_SPI_MOSI);
+    lcdSpi.begin(CYD_PIN_LCD_SCK, CYD_PIN_LCD_MISO, CYD_PIN_LCD_MOSI);
+#if !CYD_SHARED_SPI
+    touchSpi.begin(CYD_PIN_TOUCH_SCK, CYD_PIN_TOUCH_MISO, CYD_PIN_TOUCH_MOSI);
+#endif
 
     ledcAttach(CYD_PIN_LCD_BACKLIGHT, BACKLIGHT_PWM_HZ, BACKLIGHT_PWM_BITS);
     setBacklight(LCD_BRIGHTNESS_PERCENT);
 
+#if CYD_SHARED_SPI || CYD_DISPLAY_ST7789
     tft.init(LCD_NATIVE_WIDTH, LCD_NATIVE_HEIGHT);
     tft.setSPISpeed(LCD_SPI_HZ);
+#else
+    tft.begin(LCD_SPI_HZ);
+#endif
     tft.setRotation(LCD_ROTATION);
-    tft.invertDisplay(LCD_INVERT_COLORS);
+    tft.invertDisplay(LCD_INVERT_COLORS < 0 ? kDefaultInvert : LCD_INVERT_COLORS != 0);
     touch.begin();
 }
 
@@ -123,7 +168,7 @@ void drawCrosshair(int16_t x, int16_t y, uint16_t color)
 TouchRaw calibrationPoint(int16_t x, int16_t y)
 {
     ui.drawSplash("Hieu chinh cam ung", "Cham va giu vao tam dau +", "(dung que nhua hoac mong tay)");
-    drawCrosshair(x, y, ST77XX_WHITE);
+    drawCrosshair(x, y, 0xFFFF);
     const TouchRaw raw = waitForCalibrationTap();
     Serial.printf("[touch] screen(%d,%d) -> raw(%d,%d)\n", x, y, raw.x, raw.y);
     return raw;
@@ -307,6 +352,7 @@ void printHelp()
 
 void printStatus()
 {
+    Serial.printf("Board: %s\n", CYD_BOARD_NAME);
     Serial.printf("Wi-Fi: %s (%s)\n", settings.wifiSsid.c_str(),
                   WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "chua ket noi");
     Serial.printf("Model: %s, API key: %s\n", claude.model().c_str(), claude.hasApiKey() ? "da co" : "CHUA CO");
@@ -404,10 +450,10 @@ void pollTouch()
 void chatbotSetup()
 {
     Serial.begin(kSerialBaud);
-    setLed(0, 0, 0);
+    initLed();
     initDisplay();
     ui.begin();
-    ui.drawSplash("Claude Chat", "NM-CYD-C5 - giu nut BOOT de hieu chinh cam ung");
+    ui.drawSplash("Claude Chat", CYD_BOARD_NAME, "Giu nut BOOT de hieu chinh cam ung");
 
     settings = settings_store::load();
     claude.configure(settings.apiKey, settings.model);
