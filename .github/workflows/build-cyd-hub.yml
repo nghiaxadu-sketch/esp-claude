@@ -1,0 +1,91 @@
+name: Build CYD AI Safety Hub
+
+on:
+  push:
+    paths:
+      - 'projects/cyd_ai_safety_hub/**'
+      - '.github/workflows/build-cyd-hub.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SKETCH_DIR: projects/cyd_ai_safety_hub
+  ESP32_CORE: "3.3.12"
+  ESP32_INDEX: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+  FQBN: esp32:esp32:esp32:PartitionScheme=huge_app
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test logic (chạy trên máy CI, không cần board)
+        working-directory: ${{ env.SKETCH_DIR }}/tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. -o test_logic test_logic.cpp ../safety_logic.cpp ../text_util.cpp
+          ./test_logic
+          g++ -std=c++17 -fsanitize=address,undefined -g -I.. -o test_asan test_logic.cpp ../safety_logic.cpp ../text_util.cpp
+          ./test_asan
+
+      - name: Kiểm tra chứng chỉ gốc với máy chủ thật (Anthropic, Telegram)
+        working-directory: ${{ env.SKETCH_DIR }}
+        run: |
+          python3 - <<'EOF'
+          import re
+          s = open('ca_certs.h').read()
+          pem = '\n'.join(re.findall(r'^\s+"(.*)\\n"$', s, re.M)) + '\n'
+          open('/tmp/bundle.pem', 'w').write(pem)
+          EOF
+          for host in api.anthropic.com api.telegram.org; do
+            out=$(openssl s_client -connect "$host:443" -servername "$host" -CAfile /tmp/bundle.pem \
+                  -no-CApath -no-CAstore -verify_return_error </dev/null 2>&1 || true)
+            echo "$out" | grep -E "^depth=|Verify return code" | head -6
+            echo "$out" | grep -q "Verify return code: 0 (ok)" || { echo "::error::Bộ CA không xác thực được $host"; exit 1; }
+          done
+
+  firmware:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cài core ESP32 và thư viện
+        run: |
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX"
+          arduino-cli core install "esp32:esp32@${ESP32_CORE}" --additional-urls "$ESP32_INDEX"
+          arduino-cli lib install "LovyanGFX@1.2.35" "ArduinoJson@7.4.3" "WiFiManager@2.0.17"
+
+      - name: Compile
+        run: |
+          arduino-cli compile --fqbn "$FQBN" --warnings default --output-dir build "$SKETCH_DIR" 2>&1 | tee build.log
+          test "${PIPESTATUS[0]}" -eq 0
+          ls -la build
+
+      - name: Đóng gói (.bin nạp ở 0x0 + mã nguồn .zip)
+        run: |
+          mkdir -p out
+          cp build/cyd_ai_safety_hub.ino.merged.bin out/cyd_ai_safety_hub_full_0x0.bin
+          cd projects && zip -r ../out/cyd_ai_safety_hub_source.zip cyd_ai_safety_hub -x '*/build/*'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyd_ai_safety_hub
+          path: out/*
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cyd-ai-hub-latest
+          name: CYD AI Safety Hub (bản build mới nhất)
+          prerelease: true
+          make_latest: false
+          body: |
+            Firmware gộp 5 dự án cho CYD ESP32-2432S028R (AI chatbot Claude + CO2 SCD41 + cảnh báo sạc xe + Telegram + trang web).
+            - `cyd_ai_safety_hub_full_0x0.bin`: nạp bằng trình duyệt https://espressif.github.io/esptool-js/ → Connect → Flash Address `0x0` → Program.
+            - `cyd_ai_safety_hub_source.zip`: mã nguồn Arduino (mở bằng Arduino IDE).
+            Build từ commit ${{ github.sha }} với core esp32 ${{ env.ESP32_CORE }}.
+          files: out/*
