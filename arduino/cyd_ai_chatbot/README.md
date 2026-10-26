@@ -1,10 +1,17 @@
-# CYD AI Chatbot cho NM-CYD-C5 (Arduino IDE)
+# CYD AI Chatbot (Arduino IDE)
 
-Chatbot Claude chạy trên board **RockBase-iot NM-CYD-C5** (ESP32-C5, màn 2.8" ST7789 320×240, cảm ứng XPT2046).
+Chatbot Claude chạy trên màn cảm ứng "Cheap Yellow Display" 2.8" 320×240.
 Gõ câu hỏi trên bàn phím cảm ứng (hoặc trong Serial Monitor), board gửi lên Claude qua Wi-Fi rồi hiện câu trả lời trên màn.
 
-Sketch này độc lập với firmware ESP-Claw (ESP-IDF) trong repo. Chân GPIO lấy đúng theo
-`application/edge_agent/boards/rockbase-iot/nm_cyd_c5/`.
+Sketch tự nhận board theo mục **Tools → Board** (xem `board_pins.h`):
+
+| Board thật | Chọn trong Arduino IDE | Màn hình |
+|---|---|---|
+| **CYD ESP32-2432S028R** (ESP32 thường, 1 cổng micro-USB) | **ESP32 Dev Module** | ILI9341 |
+| CYD ESP32-2432S028R bản "2USB" (micro-USB + USB-C) | **ESP32 Dev Module**, đặt `CYD_DISPLAY_ST7789 1` trong `config.h` | ST7789 |
+| RockBase-iot NM-CYD-C5 | **ESP32C5 Dev Module** | ST7789 |
+
+Chọn sai loại chip thì lúc nạp sẽ báo lỗi "This chip is ESP32, not ESP32-C5" (hoặc ngược lại). Đổi lại mục Board cho đúng chip là hết.
 
 ## Tính năng
 
@@ -20,13 +27,24 @@ Sketch này độc lập với firmware ESP-Claw (ESP-IDF) trong repo. Chân GPI
 
 1. Arduino IDE 2.x → **File → Preferences → Additional boards manager URLs**, thêm:
    `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
-2. **Boards Manager** → cài **esp32 by Espressif Systems** bản **3.3.x trở lên** (ESP32-C5 chỉ có từ 3.3.0).
+2. **Boards Manager** → cài **esp32 by Espressif Systems** bản **3.3.x trở lên**.
 3. **Library Manager** → cài:
+   - `Adafruit ILI9341`
    - `Adafruit ST7735 and ST7789 Library`
    - `Adafruit GFX Library`
    - `ArduinoJson` (bản 7.x)
 
 ## 2. Chọn board (Tools)
+
+**CYD ESP32-2432S028R:**
+
+| Mục | Giá trị |
+|---|---|
+| Board | **ESP32 Dev Module** |
+| Partition Scheme | **Huge APP (3MB No OTA/1MB SPIFFS)** |
+| Upload Speed | 921600 (lỗi thì hạ xuống 115200) |
+
+**NM-CYD-C5:**
 
 | Mục | Giá trị |
 |---|---|
@@ -36,7 +54,7 @@ Sketch này độc lập với firmware ESP-Claw (ESP-IDF) trong repo. Chân GPI
 | PSRAM | **Enabled** |
 | USB CDC On Boot | **Enabled** (để Serial Monitor chạy qua cổng USB) |
 
-Partition mặc định 4MB chỉ có 1.2MB cho app, **không đủ** (Wi-Fi + TLS + màn hình). Nhớ đổi partition.
+Partition mặc định chỉ có 1.2MB cho app, **không đủ** (sketch khoảng 1.3MB). Nhớ đổi Partition Scheme.
 
 ## 3. Nạp và cài đặt
 
@@ -79,8 +97,9 @@ Giá tham khảo mỗi 1 triệu token (vào / ra): Opus 5.5 là $4 / $20, Haiku
 
 | Hằng số | Ý nghĩa |
 |---|---|
-| `LCD_ROTATION` | `1` mặc định (giống ESP-Claw). Nếu hình bị ngược thì thử `3` |
-| `LCD_INVERT_COLORS` | Đặt `true` nếu màu bị âm bản (đen thành trắng) |
+| `CYD_DISPLAY_ST7789` | Chỉ cho ESP32-2432S028R: `0` = ILI9341, `1` = ST7789 (bản 2USB) |
+| `LCD_ROTATION` | `1` mặc định. Nếu hình bị ngược thì thử `3` |
+| `LCD_INVERT_COLORS` | `-1` theo board, `1` nếu màu bị âm bản, `0` nếu không |
 | `CHAT_TEXT_SIZE` | `1`: 51 ký tự × 17 dòng. `2`: chữ to, 25 ký tự × 9 dòng |
 | `LCD_BRIGHTNESS_PERCENT` | Độ sáng đèn nền |
 | `CLAUDE_EFFORT` | `low` / `medium` / `high`... càng cao càng kỹ nhưng chậm và tốn hơn |
@@ -91,7 +110,8 @@ Giá tham khảo mỗi 1 triệu token (vào / ra): Opus 5.5 là $4 / $20, Haiku
 
 | Hiện tượng | Cách xử lý |
 |---|---|
-| Màn trắng / đen | Kiểm tra đã chọn đúng board ESP32-C5. Thử `LCD_INVERT_COLORS true` |
+| Màn trắng / đen | ESP32-2432S028R: thử đổi `CYD_DISPLAY_ST7789` (0 ↔ 1). Màu âm bản thì đổi `LCD_INVERT_COLORS` |
+| Nạp báo sai chip | Chọn lại Tools → Board đúng chip: ESP32 Dev Module hoặc ESP32C5 Dev Module |
 | Chạm lệch | Gõ `/cal` để hiệu chỉnh lại |
 | `Loi mang: ...` | Wi-Fi yếu hoặc chặn HTTPS. Gõ `/status` để xem |
 | `API loi 401` | Sai API key, gõ lại `/key ...` |
@@ -110,7 +130,7 @@ Giá tham khảo mỗi 1 triệu token (vào / ra): Opus 5.5 là $4 / $20, Haiku
 | `touch_xpt2046.cpp` | Driver cảm ứng XPT2046 trên SPI dùng chung |
 | `text_utils.cpp` | Bỏ dấu UTF-8, bỏ Markdown, ngắt dòng (có test chạy trên PC: `test/`) |
 | `settings_store.cpp` | Lưu Wi-Fi, API key, model, hiệu chỉnh vào NVS |
-| `board_pins.h` | Chân GPIO của NM-CYD-C5 |
+| `board_pins.h` | Chân GPIO của từng board, tự chọn theo chip |
 | `config.h` | Cấu hình người dùng |
 
 CI: `.github/workflows/build-cyd-chatbot.yml` chạy test `text_utils` và compile bằng arduino-cli.
