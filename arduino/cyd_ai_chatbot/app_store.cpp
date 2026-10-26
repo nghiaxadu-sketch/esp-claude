@@ -16,6 +16,7 @@ namespace {
 constexpr const char *kDir = "/apps";
 constexpr const char *kAppExt = ".json";
 constexpr const char *kStateExt = ".state";
+constexpr const char *kSamplesMarker = "/apps/.samples_v2";  // bump when new sample apps are added
 constexpr size_t kMaxIdChars = 20;
 constexpr size_t kMaxAppBytes = 16384;
 constexpr int kMaxIdSuffix = 99;
@@ -64,23 +65,22 @@ bool writeFile(const String &path, const String &text)
     return written == text.length();
 }
 
+// Installs the sample apps that are missing, once per sample set: boards upgraded from an older
+// version get the new samples (e.g. the weather app) without touching the apps already there.
 void installSamples()
 {
-    File dir = fsys->open(kDir);
-    bool empty = true;
-    if (dir && dir.isDirectory()) {
-        File entry = dir.openNextFile();
-        empty = !entry;
-        entry.close();
-    }
-    dir.close();
-    if (!empty) {
+    if (fsys->exists(kSamplesMarker)) {
         return;
     }
+    size_t installed = 0;
     for (size_t i = 0; i < builtin_apps::kAppCount; ++i) {
-        save(builtin_apps::kApps[i].id, builtin_apps::kApps[i].json);
+        const String id = builtin_apps::kApps[i].id;
+        if (!fsys->exists(appPath(id)) && save(id, builtin_apps::kApps[i].json)) {
+            ++installed;
+        }
     }
-    Serial.printf("[apps] installed %u sample apps\n", (unsigned)builtin_apps::kAppCount);
+    writeFile(kSamplesMarker, "1");
+    Serial.printf("[apps] installed %u sample apps\n", (unsigned)installed);
 }
 
 }  // namespace

@@ -48,6 +48,7 @@
 #define LCD_SPI_HZ 40000000
 #define LCD_BRIGHTNESS_PERCENT 80
 #define CHAT_TEXT_SIZE 1        // 1 = 51 chars x 17 lines, 2 = 25 chars x 9 lines
+#define SCREEN_OFF_DEFAULT_SEC 120  // backlight off after this long without touch (changeable in Settings > Man hinh)
 
 // ---- RGB LED status ----
 #define RGB_LED_ENABLED 1
@@ -55,3 +56,10 @@
 
 // ---- Speaker (ESP32-2432S028R "SPEAK" connector; NM-CYD-C5 has none) ----
 #define SPEAKER_ENABLED 1
+
+// ---- AI face ("Claude" on the home screen): a robot face with eyes, mouth and moods that talks back ----
+#define FACE_MAX_TOKENS 2048      // includes thinking; replies are kept to a few sentences by the prompt
+#define FACE_EFFORT "low"
+#define FACE_HISTORY_MAX_MESSAGES 8
+#define FACE_VOICE_BLIPS 1        // 1 = little "robot voice" beeps while the face talks (needs a speaker)
+#define FACE_SLEEP_AFTER_MS 90000 // no touch for this long: the face gets sleepy, then falls asleep

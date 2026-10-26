@@ -43,7 +43,7 @@ constexpr SingleMap kSingleMaps[] = {
     {0x01A0, "O"}, {0x01A1, "o"},   // Ơ ơ
     {0x01AF, "U"}, {0x01B0, "u"},   // Ư ư
     {0x00A0, " "},                  // no-break space
-    {0x00B0, "o"},                  // degree sign
+    {0x00B0, "\xF7"},               // degree sign: the GFX font draws its degree glyph for 0xF7
     {0x00AB, "\""}, {0x00BB, "\""}, // « »
     {0x2018, "'"}, {0x2019, "'"},
     {0x201C, "\""}, {0x201D, "\""},
@@ -239,6 +239,39 @@ std::vector<std::string> wrapText(const std::string &text, size_t maxChars)
         paraStart = paraEnd + 1;
     }
     return lines;
+}
+
+std::string takeMoodTag(std::string &text)
+{
+    constexpr size_t kMaxTag = 16;
+    size_t start = 0;
+    while (start < text.size() && (text[start] == ' ' || text[start] == '\n')) {
+        ++start;
+    }
+    if (start >= text.size() || text[start] != '[') {
+        return std::string();
+    }
+    const size_t close = text.find(']', start + 1);
+    if (close == std::string::npos || close == start + 1 || close - start - 1 > kMaxTag) {
+        return std::string();
+    }
+    std::string tag;
+    for (size_t i = start + 1; i < close; ++i) {
+        char c = text[i];
+        if (c >= 'A' && c <= 'Z') {
+            c = (char)(c - 'A' + 'a');
+        }
+        if (!((c >= 'a' && c <= 'z') || c == '_' || c == '-')) {
+            return std::string();
+        }
+        tag += c;
+    }
+    size_t rest = close + 1;
+    while (rest < text.size() && (text[rest] == ' ' || text[rest] == '\n')) {
+        ++rest;
+    }
+    text.erase(0, rest);
+    return tag;
 }
 
 }  // namespace text_utils

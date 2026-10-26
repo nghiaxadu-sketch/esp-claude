@@ -189,6 +189,71 @@ static void testBuiltinApps()
     }
 }
 
+// Answers the weather app's http() calls like the Open-Meteo API (the board returns arrays as JSON text).
+class WeatherDevice : public FakeDevice {
+public:
+    bool callFunction(const std::string &name, const std::vector<mini_script::Value> &args,
+                      mini_script::Value &result, std::string &error) override
+    {
+        if (name == "wifi") {
+            result = mini_script::Value::number(1);
+            return true;
+        }
+        if (name != "http") {
+            return FakeDevice::callFunction(name, args, result, error);
+        }
+        ++httpCalls;
+        const std::string path = args.size() > 1 ? args[1].toString() : std::string();
+        if (path == "current.temperature_2m") {
+            result = mini_script::Value::number(29.6);
+        } else if (path == "daily.temperature_2m_max") {
+            result = mini_script::Value::string("[31.2,32,30.4,29.9,33.1]");
+        } else if (path == "daily.temperature_2m_min") {
+            result = mini_script::Value::string("[24,25.5,23.1,22,24.8]");
+        } else if (path == "daily.weather_code") {
+            result = mini_script::Value::string("[61,0,3,95,2]");
+        } else {
+            result = mini_script::Value::string("");
+        }
+        return true;
+    }
+};
+
+static void testWeatherApp()
+{
+    const char *json = nullptr;
+    for (size_t i = 0; i < builtin_apps::kAppCount; ++i) {
+        if (std::string(builtin_apps::kApps[i].id) == "thoi_tiet") {
+            json = builtin_apps::kApps[i].json;
+        }
+    }
+    EXPECT(json != nullptr);
+    if (json == nullptr) {
+        return;
+    }
+    RecordingCanvas canvas;
+    WeatherDevice device;
+    mini_app::MiniApp app(canvas, device);
+    std::string err;
+    EXPECT(app.load(json, err));
+    EXPECT(app.start(err));
+    EXPECT(canvas.drew("Dang tai..."));
+    for (int t = 0; t < 5; ++t) {
+        device.now += 400;
+        app.loop();
+    }
+    EXPECT(!app.hasError());
+    EXPECT(device.httpCalls == 4);
+    expectEq(evalText(const_cast<mini_script::Interpreter &>(app.script()), "hi1 + '/' + lo2 + '/' + c3"), "32/23.1/95",
+             "weather arrays parsed");
+    EXPECT(canvas.drew("30"));
+    EXPECT(canvas.drew("Co mua"));
+    EXPECT(canvas.drew("Hom nay"));
+    EXPECT(canvas.drew("Thu 3"));  // weekday() is Monday in the fake device, so tomorrow is Tuesday
+    EXPECT(canvas.drew("24\xF7"));
+    EXPECT(canvas.drew("33\xF7"));
+}
+
 static void testTimerApp()
 {
     RecordingCanvas canvas;
@@ -275,6 +340,7 @@ int main()
     testJson();
     testScript();
     testBuiltinApps();
+    testWeatherApp();
     testTimerApp();
     testErrors();
     if (failures == 0) {

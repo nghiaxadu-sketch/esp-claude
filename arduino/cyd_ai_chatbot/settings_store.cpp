@@ -13,6 +13,10 @@ constexpr const char *kKeyPassword = "pass";
 constexpr const char *kKeyApiKey = "apikey";
 constexpr const char *kKeyModel = "model";
 constexpr const char *kKeyTouchCal = "touchcal";
+constexpr const char *kKeyBrightness = "bright";
+constexpr const char *kKeyFlipped = "flip";
+constexpr const char *kKeyScreenOff = "screenoff";
+constexpr const char *kKeySound = "sound";
 
 String readString(Preferences &prefs, const char *key, const char *fallback)
 {
@@ -68,6 +72,55 @@ void saveApiKey(const String &apiKey)
 void saveModel(const String &model)
 {
     writeString(kKeyModel, model);
+}
+
+DeviceSettings loadDevice()
+{
+    DeviceSettings d = {LCD_BRIGHTNESS_PERCENT, false, SCREEN_OFF_DEFAULT_SEC, true};
+    Preferences prefs;
+    if (!prefs.begin(kNamespace, false)) {
+        return d;
+    }
+    d.brightness = prefs.getUChar(kKeyBrightness, d.brightness);
+    d.flipped = prefs.getBool(kKeyFlipped, d.flipped);
+    d.screenOffSec = prefs.getUShort(kKeyScreenOff, d.screenOffSec);
+    d.sound = prefs.getBool(kKeySound, d.sound);
+    prefs.end();
+    return d;
+}
+
+void saveDevice(const DeviceSettings &device)
+{
+    Preferences prefs;
+    if (!prefs.begin(kNamespace, false)) {
+        return;
+    }
+    prefs.putUChar(kKeyBrightness, device.brightness);
+    prefs.putBool(kKeyFlipped, device.flipped);
+    prefs.putUShort(kKeyScreenOff, device.screenOffSec);
+    prefs.putBool(kKeySound, device.sound);
+    prefs.end();
+}
+
+int32_t loadInt(const char *key, int32_t fallback)
+{
+    Preferences prefs;
+    if (!prefs.begin(kNamespace, false)) {
+        return fallback;
+    }
+    const int32_t value = prefs.getInt(key, fallback);
+    prefs.end();
+    return value;
+}
+
+void saveInt(const char *key, int32_t value)
+{
+    Preferences prefs;
+    if (!prefs.begin(kNamespace, false)) {
+        return;
+    }
+    prefs.putInt(key, value);
+    prefs.end();
 }
 
 bool loadTouchCalibration(TouchCalibration &cal)

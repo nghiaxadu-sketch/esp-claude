@@ -3,6 +3,7 @@
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
+#include <algorithm>
 
 #include "board_pins.h"
 #include "config.h"
@@ -18,6 +19,7 @@ constexpr uint32_t kCalStableMs = 300;
 constexpr int16_t kCrossHalf = 10;
 constexpr int16_t kCrossCircle = 6;
 constexpr int kLightRawMax = 4095;
+constexpr uint8_t kMinBrightnessSetting = 5;
 
 #if CYD_SHARED_SPI
 SPIClass &lcdSpi = SPI;
@@ -40,6 +42,9 @@ constexpr bool kDefaultInvert = kUseSt7789 && !CYD_SHARED_SPI;
 
 TouchXpt2046 touchPanel(touchSpi, CYD_PIN_TOUCH_CS, ui::kScreenW, ui::kScreenH);
 uint8_t backlightPercent = LCD_BRIGHTNESS_PERCENT;
+uint8_t brightnessPercent = LCD_BRIGHTNESS_PERCENT;
+bool screenFlipped = false;
+bool soundOn = true;
 bool speakerReady = false;
 uint32_t beepStopMs = 0;
 bool beeping = false;
@@ -90,6 +95,17 @@ void drawCrosshair(int16_t x, int16_t y, uint16_t color)
     tft.drawFastHLine(x - kCrossHalf, y, 2 * kCrossHalf + 1, color);
     tft.drawFastVLine(x, y - kCrossHalf, 2 * kCrossHalf + 1, color);
     tft.drawCircle(x, y, kCrossCircle, color);
+}
+
+// The calibration is stored for the unflipped screen; readTouch() turns it around when flipped.
+int16_t unflipX(int16_t x)
+{
+    return screenFlipped ? ui::kScreenW - 1 - x : x;
+}
+
+int16_t unflipY(int16_t y)
+{
+    return screenFlipped ? ui::kScreenH - 1 - y : y;
 }
 
 TouchRaw calibrationPoint(int16_t x, int16_t y)
@@ -146,6 +162,32 @@ TouchXpt2046 &touch()
     return touchPanel;
 }
 
+bool readTouch(int16_t &x, int16_t &y)
+{
+    if (!touchPanel.read(x, y)) {
+        return false;
+    }
+    x = unflipX(x);
+    y = unflipY(y);
+    return true;
+}
+
+void pushImage(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pixels)
+{
+    tft.drawRGBBitmap(x, y, pixels, w, h);  // Adafruit_SPITFT version: one address window, burst write
+}
+
+void setFlipped(bool flipped)
+{
+    screenFlipped = flipped;
+    tft.setRotation(flipped ? (LCD_ROTATION + 2) % 4 : LCD_ROTATION);
+}
+
+bool flipped()
+{
+    return screenFlipped;
+}
+
 void setLed(uint8_t r, uint8_t g, uint8_t b)
 {
 #if RGB_LED_ENABLED
@@ -179,6 +221,30 @@ uint8_t backlight()
     return backlightPercent;
 }
 
+void setBrightnessSetting(uint8_t percent)
+{
+    brightnessPercent = (uint8_t)std::min<int>(std::max<int>(percent, kMinBrightnessSetting), 100);
+    setBacklight(brightnessPercent);
+}
+
+uint8_t brightnessSetting()
+{
+    return brightnessPercent;
+}
+
+void setSoundEnabled(bool enabled)
+{
+    soundOn = enabled;
+    if (!enabled) {
+        stopBeep();
+    }
+}
+
+bool soundEnabled()
+{
+    return soundOn;
+}
+
 bool hasSpeaker()
 {
     return CYD_PIN_SPEAKER >= 0 && SPEAKER_ENABLED;
@@ -186,7 +252,7 @@ bool hasSpeaker()
 
 void beep(uint32_t freqHz, uint32_t durationMs)
 {
-    if (!hasSpeaker() || freqHz == 0 || durationMs == 0) {
+    if (!hasSpeaker() || !soundOn || freqHz == 0 || durationMs == 0) {
         return;
     }
     if (!speakerReady) {
@@ -245,10 +311,10 @@ void runTouchCalibration()
         cal.rawX1 = swap ? p1.y : p1.x;
         cal.rawY0 = swap ? p0.x : p0.y;
         cal.rawY1 = swap ? p2.x : p2.y;
-        cal.screenX0 = left;
-        cal.screenX1 = right;
-        cal.screenY0 = top;
-        cal.screenY1 = bottom;
+        cal.screenX0 = unflipX(left);
+        cal.screenX1 = unflipX(right);
+        cal.screenY0 = unflipY(top);
+        cal.screenY1 = unflipY(bottom);
 
         if (abs(cal.rawX1 - cal.rawX0) >= kCalMinRawSpan && abs(cal.rawY1 - cal.rawY0) >= kCalMinRawSpan) {
             touchPanel.setCalibration(cal);

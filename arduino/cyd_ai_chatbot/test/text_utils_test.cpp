@@ -37,7 +37,7 @@ int main()
     expectEq(utf8ToAscii("Ấ ầ Ẩ ẫ Ặ ẹ Ế ỉ Ị ọ Ố ờ Ở ỡ Ợ ụ Ứ ừ Ử ữ Ự ỳ Ỵ ỷ Ỹ"),
              "A a A a A e E i I o O o O o O u U u U u U y Y y Y", "tone marks");
     expectEq(utf8ToAscii("Tiếng Việt: Hải Phòng, Lê Chân"), "Tieng Viet: Hai Phong, Le Chan", "place names");
-    expectEq(utf8ToAscii("“Ngoặc” ‘đơn’ – gạch … 25°C"), "\"Ngoac\" 'don' - gach ... 25oC", "punctuation");
+    expectEq(utf8ToAscii("“Ngoặc” ‘đơn’ – gạch … 25°C"), "\"Ngoac\" 'don' - gach ... 25\xF7" "C", "punctuation");
     expectEq(utf8ToAscii("Chào 👋🏻 bạn ✨!"), "Chao  ban !", "emoji dropped");
     expectEq(utf8ToAscii("Tie\xcc\x82\xcc\x81ng"), "Tieng", "decomposed marks dropped");
     expectEq(utf8ToAscii("a\r\nb\tc"), "a\nb c", "control chars");
@@ -54,6 +54,21 @@ int main()
     expectLines(wrapText("  cach   nhieu  ", 20), {"cach nhieu"}, "collapse spaces");
     expectLines(wrapText("", 10), {""}, "empty text");
     expectLines(wrapText("x\n", 10), {"x", ""}, "trailing newline");
+
+    std::string reply = "  [Happy] Chao ban!";
+    expectEq(takeMoodTag(reply), "happy", "mood tag");
+    expectEq(reply, "Chao ban!", "mood tag removed");
+    reply = "[surprised]\nOi!";
+    expectEq(takeMoodTag(reply), "surprised", "mood tag before newline");
+    expectEq(reply, "Oi!", "newline after tag removed");
+    reply = "Khong co tag [happy]";
+    expectEq(takeMoodTag(reply), "", "tag not at start");
+    expectEq(reply, "Khong co tag [happy]", "text kept without tag");
+    reply = "[1, 2] la mang";
+    expectEq(takeMoodTag(reply), "", "brackets that are not a tag");
+    expectEq(reply, "[1, 2] la mang", "text kept for non-tag");
+    reply = "[]";
+    expectEq(takeMoodTag(reply), "", "empty tag");
 
     if (failures == 0) {
         std::printf("text_utils: all tests passed\n");

@@ -11,7 +11,7 @@
 namespace {
 
 // How apps are written. The device functions, board notes and the example are appended at runtime.
-constexpr const char *kAppFormatGuide = R"GUIDE(You write small apps for an ESP32 board with a 2.8" 320x240 landscape resistive touch screen (taps only, no swipe or drag) and an RGB LED. The app is ONE JSON object that the device interprets. Reply with ONLY that JSON object: no prose, no Markdown fences.
+constexpr const char *kAppFormatGuide = R"GUIDE(You write small apps for an ESP32 board with a 2.8" 320x240 landscape resistive touch screen, used with a stylus or a finger (taps only, no swipe or drag), and an RGB LED. The app is ONE JSON object that the device interprets. Reply with ONLY that JSON object: no prose, no Markdown fences.
 
 Top-level fields:
 - "name": short app name in Vietnamese (max 16 chars). "color": launcher tile color. "bg": background color.
@@ -39,8 +39,8 @@ Built-in functions: abs min max floor ceil round(x[,digits]) int sqrt pow sin co
 constexpr const char *kAppRules = R"RULES(
 Rules:
 - Declare every variable in "vars". Use only the functions and item types listed above.
-- Keep everything inside x 0..319, y 0..239. Touch targets at least 44x36 px with 6 px gaps (the touch panel is imprecise).
-- The user leaves an app by holding the screen for 1.5 s, so no exit button is needed.
+- Keep everything inside x 0..319, y 0..239. Touch targets at least 40x32 px with 6 px gaps.
+- The board draws a round "<" back button over the top-left corner (x < 44, y < 32) that closes the app: keep that corner free of buttons and important text, and add no exit button.
 - Keep the JSON under 5000 characters; reuse items with "show" rather than many copies.
 - Live data: call http() with a free JSON API that needs no key, in "init" and in a timer of at least 60000 ms, store the value in a var and show a loading text until it arrives.
 - All text the user sees is Vietnamese.

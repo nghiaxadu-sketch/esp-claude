@@ -13,12 +13,16 @@
 #include "board_hw.h"
 #include "board_pins.h"
 #include "chat_ui.h"
+#include "claude_async.h"
 #include "claude_client.h"
 #include "config.h"
+#include "face_ui.h"
+#include "games_ui.h"
 #include "launcher_ui.h"
 #include "mini_app.h"
 #include "mini_json.h"
 #include "settings_store.h"
+#include "settings_ui.h"
 #include "touch_keyboard.h"
 #include "ui_common.h"
 #include "web_portal.h"
@@ -35,9 +39,13 @@ constexpr uint32_t kStatusRefreshMs = 1000;
 constexpr uint32_t kBootHoldWindowMs = 1500;
 constexpr uint32_t kTouchReleaseMs = 60;      // touch must be gone this long to count as released
 constexpr uint32_t kLauncherHoldMs = 700;     // long press on a tile opens its menu
+constexpr int16_t kDragMinPx = 2;             // stylus movement that counts as a drag
+constexpr int16_t kHoldSlopPx = 12;           // a long press must stay this close to where it started
+constexpr int16_t kSwipeMinPx = 50;           // horizontal movement that turns a tap into a page swipe
 constexpr uint32_t kProgressRedrawMs = 300;
 constexpr size_t kSerialLineMax = 512;
 constexpr size_t kChatInputMax = 300;
+constexpr size_t kFaceInputMax = 200;
 constexpr size_t kAppInputMax = 300;
 constexpr size_t kPasswordMax = 64;
 constexpr size_t kSplashChars = 52;
@@ -56,21 +64,39 @@ constexpr const char *kChatSystemPrompt =
     "If the user wants a tool, game or gadget on the device, tell them to press \"+ App\" on the home screen "
     "and describe it: you will then write it as an app that runs on the board.";
 
-enum class Screen : uint8_t { Launcher, Chat, Keyboard, Wifi, App, Busy };
-enum class InputPurpose : uint8_t { ChatQuestion, NewApp, EditApp, WifiPassword };
+// The face shows the mood tag as an expression, so every reply starts with one.
+constexpr const char *kFaceSystemPrompt =
+    "You are Claude, appearing as a cute robot face with big glowing eyes and a mouth on the small 320x240 screen "
+    "of an ESP32 gadget on the user's desk. You have no camera or microphone: the user types short messages on a "
+    "touch keyboard, often Vietnamese without diacritics; read them as normal Vietnamese and answer in the user's "
+    "language. Start EVERY reply with exactly one mood tag that matches your feeling: [happy] [sad] [angry] "
+    "[surprised] [love] [thinking] [sleepy] [wink] [neutral]. After the tag write 1 to 3 short spoken sentences, "
+    "at most 45 words, warm and playful like a friendly desk pet. Plain text only: no Markdown, lists, emoji or "
+    "other brackets.";
+
+// Models offered by Settings > AI Model (tap to switch).
+constexpr const char *kModels[] = {"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"};
+enum class Screen : uint8_t { Launcher, Chat, Keyboard, Wifi, App, Busy, Settings, Games, Face };
+enum class InputPurpose : uint8_t { ChatQuestion, NewApp, EditApp, WifiPassword, FaceQuestion };
 
 Adafruit_GFX &tft = board_hw::display();
 ChatUi chat(tft);
 LauncherUi launcher(tft);
 WifiUi wifiScreen(tft);
 TouchKeyboard keyboard(tft);
+SettingsUi settingsUi(tft);
+GamesUi games(tft);
+FaceUi face(tft);
 ClaudeClient claude;
+ClaudeAsync claudeAsync(claude);
 AppBuilder builder(claude);
 GfxCanvas canvas(tft);
 BoardDevice device;
 mini_app::MiniApp runningApp(canvas, device);
 AppSettings settings;
+DeviceSettings deviceCfg;
 std::vector<ChatMessage> history;
+std::vector<ChatMessage> faceHistory;
 
 Screen screen = Screen::Launcher;
 InputPurpose inputPurpose = InputPurpose::ChatQuestion;
@@ -85,7 +111,13 @@ String serialLine;
 
 bool touchDown = false;
 bool longFired = false;
+bool swallowTouch = false;  // the press that woke the screen does nothing else
+bool deviceDirty = false;   // Settings changed, saved when the stylus lifts
+bool screenAsleep = false;
+bool wifiFromSettings = false;  // "<" on the Wi-Fi screen returns to Settings
+uint32_t lastActivityMs = 0;
 int16_t pressX = 0, pressY = 0;
+int16_t lastX = 0, lastY = 0;
 uint32_t pressStartMs = 0;
 uint32_t lastTouchSeenMs = 0;
 bool bootWasDown = false;
@@ -117,6 +149,12 @@ String statusText()
     return clock.length() > 0 ? clock : wifi_manager::ip();
 }
 
+// Right side of the launcher's top line.
+String launcherStatusText()
+{
+    return wifi_manager::connected() ? ui::ellipsize(ui::toAscii(wifi_manager::ssid()), 24) : String("Mat Wi-Fi");
+}
+
 String wifiStatusText()
 {
     if (!wifi_manager::connected()) {
@@ -144,16 +182,58 @@ void hideAll()
     chat.hide();
     launcher.hide();
     wifiScreen.hide();
+    settingsUi.hide();
+    games.hide();
+    face.hide();
 }
 
 void showLauncher(const String &notice = String())
 {
     hideAll();
+    wifiFromSettings = false;
     screen = Screen::Launcher;
     tiles = app_store::list();
-    launcher.setStatus(statusText());
+    launcher.setStatus(clockText(), launcherStatusText());
     launcher.setNotice(notice);
     launcher.show(tiles);
+}
+
+SettingsInfo settingsInfo()
+{
+    SettingsInfo info;
+    info.model = claude.model();
+    info.hasApiKey = claude.hasApiKey();
+    info.wifiConnected = wifi_manager::connected();
+    info.ssid = ui::toAscii(wifi_manager::connected() ? wifi_manager::ssid() : settings.wifiSsid);
+    info.ip = wifi_manager::ip();
+    info.board = CYD_BOARD_NAME;
+    info.hasSpeaker = board_hw::hasSpeaker();
+    info.freeHeap = ESP.getFreeHeap();
+    info.freePsram = ESP.getFreePsram();
+    info.appCount = app_store::list().size();
+    info.uptimeSec = millis() / 1000;
+    return info;
+}
+
+void showSettings()
+{
+    hideAll();
+    screen = Screen::Settings;
+    settingsUi.show(settingsInfo(), deviceCfg);
+}
+
+void showGames()
+{
+    hideAll();
+    screen = Screen::Games;
+    games.show();
+}
+
+void showFace()
+{
+    hideAll();
+    screen = Screen::Face;
+    face.show();
 }
 
 void showChat()
@@ -273,6 +353,7 @@ void trimHistory()
 
 void askClaude(const String &question)
 {
+    claudeAsync.waitIdle();  // the face may still be waiting for its answer
     if (screen != Screen::Chat) {
         showChat();
     }
@@ -313,6 +394,128 @@ void clearConversation()
     board_hw::setLed(0, 0, 0);
 }
 
+// ---------------------------------------------------------------- AI face
+
+void trimFaceHistory()
+{
+    while (faceHistory.size() > FACE_HISTORY_MAX_MESSAGES) {
+        faceHistory.erase(faceHistory.begin());
+    }
+    while (!faceHistory.empty() && faceHistory.front().role != ChatRole::User) {
+        faceHistory.erase(faceHistory.begin());
+    }
+}
+
+// Starts a request in the background; the face thinks until pollFaceAnswer() gets the reply.
+void askFace(const String &question)
+{
+    if (!wifi_manager::connected()) {
+        face.sayError("Minh chua co Wi-Fi. Vao Cai dat > Wi-Fi de noi mang nhe.");
+        return;
+    }
+    if (!claude.hasApiKey()) {
+        face.sayError("Minh chua co API key. Mo http://<IP>/ tren dien thoai de nhap.");
+        return;
+    }
+    if (claudeAsync.busy()) {
+        return;
+    }
+    faceHistory.push_back({ChatRole::User, question});
+    trimFaceHistory();
+    if (!claudeAsync.start(kFaceSystemPrompt, faceHistory, FACE_MAX_TOKENS, FACE_EFFORT)) {
+        faceHistory.pop_back();
+        face.sayError("Khong du bo nho de hoi Claude.");
+        return;
+    }
+    face.setThinking(ui::toAscii(question));
+    board_hw::setLed(0, 0, 255);
+}
+
+void pollFaceAnswer()
+{
+    bool ok;
+    String reply, error;
+    if (!claudeAsync.takeResult(ok, reply, error)) {
+        return;
+    }
+    if (ok) {
+        faceHistory.push_back({ChatRole::Assistant, reply});
+        face.say(reply);
+        Serial.printf("Claude (mat): %s\n", reply.c_str());
+        board_hw::setLed(0, 255, 0);
+    } else {
+        if (!faceHistory.empty() && faceHistory.back().role == ChatRole::User) {
+            faceHistory.pop_back();
+        }
+        face.sayError(error);
+        Serial.printf("[face] %s\n", error.c_str());
+        board_hw::setLed(255, 0, 0);
+    }
+}
+
+// ---------------------------------------------------------------- settings
+
+void applyDevice(const DeviceSettings &next)
+{
+    const bool flipChanged = next.flipped != deviceCfg.flipped;
+    deviceCfg = next;
+    board_hw::setBrightnessSetting(deviceCfg.brightness);
+    board_hw::setSoundEnabled(deviceCfg.sound);
+    if (flipChanged) {
+        board_hw::setFlipped(deviceCfg.flipped);
+        settingsUi.update(settingsInfo());
+    }
+    deviceDirty = true;
+}
+
+void saveDeviceIfDirty()
+{
+    if (deviceDirty) {
+        deviceDirty = false;
+        settings_store::saveDevice(deviceCfg);
+    }
+}
+
+void nextModel()
+{
+    claudeAsync.waitIdle();
+    size_t i = 0;
+    const size_t count = sizeof(kModels) / sizeof(kModels[0]);
+    while (i < count && claude.model() != kModels[i]) {
+        ++i;
+    }
+    settings.model = kModels[(i + 1) % count];  // an unknown custom model goes back to the first one
+    settings_store::saveModel(settings.model);
+    claude.configure(settings.apiKey, settings.model);
+    settingsUi.update(settingsInfo());
+}
+
+void handleSettingsAction(SettingsAction action)
+{
+    switch (action) {
+    case SettingsAction::Back:
+        saveDeviceIfDirty();
+        showLauncher();
+        break;
+    case SettingsAction::Wifi:
+        wifiFromSettings = true;
+        showWifi(true);
+        break;
+    case SettingsAction::Calibrate:
+        board_hw::runTouchCalibration();
+        showSettings();
+        break;
+    case SettingsAction::DeviceChanged:
+        applyDevice(settingsUi.device());
+        break;
+    case SettingsAction::NextModel:
+        nextModel();
+        break;
+    case SettingsAction::None:
+        break;
+    }
+}
+
 // ---------------------------------------------------------------- apps
 
 void openApp(const String &id)
@@ -334,10 +537,12 @@ void openApp(const String &id)
     runningAppId = id;
     device.reset();
     Serial.printf("[apps] run %s\n", id.c_str());
+    canvas.invalidateOverlay();
     if (!runningApp.start(err)) {
-        lastErrors[id] = err.c_str();  // the app shows the error banner; holding the screen exits
+        lastErrors[id] = err.c_str();  // the app shows the error banner; "<" or holding the screen exits
         Serial.printf("[apps] %s: %s\n", id.c_str(), err.c_str());
     }
+    canvas.refreshOverlay();
 }
 
 void exitApp()
@@ -365,6 +570,7 @@ String appNameOf(const String &json)
 // Creates a new app (editId empty) or changes an existing one, then runs it.
 void buildApp(const String &request, const String &editId)
 {
+    claudeAsync.waitIdle();
     if (!wifi_manager::connected()) {
         showLauncher("Can Wi-Fi de Claude viet app. Bam \"Wi-Fi\".");
         return;
@@ -476,6 +682,12 @@ void handleKeyboardDone()
     case InputPurpose::WifiPassword:
         connectTo(pendingSsid, text);
         break;
+    case InputPurpose::FaceQuestion:
+        showFace();
+        if (text.length() > 0) {
+            askFace(text);
+        }
+        break;
     }
 }
 
@@ -487,6 +699,9 @@ void handleKeyboardCancel()
         break;
     case InputPurpose::WifiPassword:
         showWifi(false);
+        break;
+    case InputPurpose::FaceQuestion:
+        showFace();
         break;
     default:
         showLauncher();
@@ -509,8 +724,14 @@ void handleLauncherAction(LauncherAction action)
     case LauncherAction::NewApp:
         showKeyboard(InputPurpose::NewApp, "Tao app moi", String(), "Mo ta app ban muon...", kAppInputMax, "Tao");
         break;
-    case LauncherAction::Wifi:
-        showWifi(true);
+    case LauncherAction::Settings:
+        showSettings();
+        break;
+    case LauncherAction::Games:
+        showGames();
+        break;
+    case LauncherAction::Face:
+        showFace();
         break;
     case LauncherAction::None:
         break;
@@ -575,7 +796,12 @@ void onPress(int16_t x, int16_t y)
     case Screen::Wifi:
         switch (wifiScreen.handleTouch(x, y)) {
         case WifiAction::Back:
-            showLauncher();
+            if (wifiFromSettings) {
+                wifiFromSettings = false;
+                showSettings();
+            } else {
+                showLauncher();
+            }
             break;
         case WifiAction::Rescan:
             showWifi(true);
@@ -588,7 +814,33 @@ void onPress(int16_t x, int16_t y)
         }
         break;
     case Screen::App:
-        runningApp.touch(x, y);
+        if (ui::backTapped(x, y)) {
+            exitApp();
+        } else {
+            runningApp.touch(x, y);
+            canvas.refreshOverlay();
+        }
+        break;
+    case Screen::Settings:
+        handleSettingsAction(settingsUi.handleTouch(x, y));
+        break;
+    case Screen::Games:
+        if (games.press(x, y) == GamesAction::Exit) {
+            showLauncher();
+        }
+        break;
+    case Screen::Face:
+        switch (face.press(x, y)) {
+        case FaceAction::Back:
+            showLauncher();
+            break;
+        case FaceAction::Compose:
+            showKeyboard(InputPurpose::FaceQuestion, "Noi voi Claude", String(), "Go loi muon noi...", kFaceInputMax,
+                         "Gui");
+            break;
+        case FaceAction::None:
+            break;
+        }
         break;
     case Screen::Launcher:
     case Screen::Busy:
@@ -596,14 +848,35 @@ void onPress(int16_t x, int16_t y)
     }
 }
 
+// The stylus moved while pressed.
+void onDrag(int16_t x, int16_t y)
+{
+    if (screen == Screen::Games) {
+        games.drag(x, y);
+    } else if (screen == Screen::Settings) {
+        handleSettingsAction(settingsUi.handleDrag(x, y));
+    }
+}
+
+void onRelease()
+{
+    if (screen == Screen::Games) {
+        games.release();
+    }
+    saveDeviceIfDirty();
+}
+
 // Released before the long-press time (launcher only: a hold must not also open the app).
-void onTap(int16_t x, int16_t y)
+// dx is how far the stylus moved sideways: a swipe changes the page instead of opening an icon.
+void onTap(int16_t x, int16_t y, int16_t dx)
 {
     if (screen != Screen::Launcher) {
         return;
     }
     if (launcher.menuVisible()) {
         handleMenuAction(launcher.handleMenuTap(x, y));
+    } else if (abs(dx) >= kSwipeMinPx) {
+        launcher.handleSwipe(dx);
     } else {
         handleLauncherAction(launcher.handleTap(x, y));
     }
@@ -623,22 +896,62 @@ uint32_t longPressMs()
     return screen == Screen::App ? APP_EXIT_HOLD_MS : kLauncherHoldMs;
 }
 
+void wakeScreen()
+{
+    if (screenAsleep) {
+        screenAsleep = false;
+        board_hw::setBacklight(board_hw::brightnessSetting());
+    }
+}
+
+// Turns the backlight off after the time chosen in Settings > Man hinh (never while Claude is working).
+void maintainScreenSleep(uint32_t now)
+{
+    if (screenAsleep || deviceCfg.screenOffSec == 0 || screen == Screen::Busy || claudeAsync.busy()) {
+        if (claudeAsync.busy()) {
+            lastActivityMs = now;
+        }
+        return;
+    }
+    if (now - lastActivityMs > (uint32_t)deviceCfg.screenOffSec * 1000) {
+        screenAsleep = true;
+        board_hw::setBacklight(0);
+    }
+}
+
 void pollTouch()
 {
     int16_t x, y;
-    const bool down = board_hw::touch().read(x, y);
+    const bool down = board_hw::readTouch(x, y);
     const uint32_t now = millis();
     if (down) {
         lastTouchSeenMs = now;
+        lastActivityMs = now;
+        if (screenAsleep) {
+            wakeScreen();
+            swallowTouch = true;
+        }
+        if (swallowTouch) {
+            touchDown = true;
+            return;
+        }
         if (!touchDown) {
             touchDown = true;
             longFired = false;
-            pressX = x;
-            pressY = y;
+            pressX = lastX = x;
+            pressY = lastY = y;
             pressStartMs = now;
             onPress(x, y);
-        } else if (!longFired && now - pressStartMs >= longPressMs() &&
-                   (screen == Screen::App || screen == Screen::Launcher)) {
+            return;
+        }
+        if (abs(x - lastX) >= kDragMinPx || abs(y - lastY) >= kDragMinPx) {
+            lastX = x;
+            lastY = y;
+            onDrag(x, y);
+        }
+        const bool stayed = abs(lastX - pressX) < kHoldSlopPx && abs(lastY - pressY) < kHoldSlopPx;
+        if (!longFired && stayed && now - pressStartMs >= longPressMs() &&
+            (screen == Screen::App || screen == Screen::Launcher)) {
             longFired = true;
             onLongPress(pressX, pressY);
         }
@@ -647,8 +960,13 @@ void pollTouch()
     // Short dropouts of the resistive panel are not releases.
     if (touchDown && now - lastTouchSeenMs > kTouchReleaseMs) {
         touchDown = false;
+        if (swallowTouch) {
+            swallowTouch = false;
+            return;
+        }
+        onRelease();
         if (!longFired) {
-            onTap(pressX, pressY);
+            onTap(pressX, pressY, lastX - pressX);
         }
     }
 }
@@ -657,7 +975,10 @@ void pollBootButton()
 {
     const bool down = board_hw::bootButtonDown();
     if (down && !bootWasDown) {
-        if (screen == Screen::App) {
+        lastActivityMs = millis();
+        if (screenAsleep) {
+            wakeScreen();
+        } else if (screen == Screen::App) {
             exitApp();
         } else if (screen != Screen::Launcher && screen != Screen::Busy) {
             showLauncher();
@@ -679,6 +1000,7 @@ void printHelp()
     Serial.println("  /apps                     danh sach app");
     Serial.println("  /run ID   /del ID         chay / xoa app");
     Serial.println("  /cal                      hieu chinh cam ung");
+    Serial.println("  /face loi muon noi        noi chuyen voi mat Claude");
     Serial.println("  /clear                    xoa hoi thoai");
     Serial.println("  /status                   xem trang thai");
     Serial.println("  (go chu binh thuong de hoi Claude)");
@@ -711,12 +1033,14 @@ void handleSerialCommand(String line)
             Serial.printf("  %4d dBm  ch%-3u %s %s\n", (int)n.rssi, n.channel, n.open ? "  " : "**", n.ssid.c_str());
         }
     } else if (line.startsWith("/key ")) {
+        claudeAsync.waitIdle();
         settings.apiKey = line.substring(5);
         settings.apiKey.trim();
         settings_store::saveApiKey(settings.apiKey);
         claude.configure(settings.apiKey, settings.model);
         Serial.println("Da luu API key.");
     } else if (line.startsWith("/model ")) {
+        claudeAsync.waitIdle();
         settings.model = line.substring(7);
         settings.model.trim();
         settings_store::saveModel(settings.model);
@@ -744,12 +1068,20 @@ void handleSerialCommand(String line)
     } else if (line == "/cal") {
         board_hw::runTouchCalibration();
         showLauncher();
+    } else if (line.startsWith("/face ")) {
+        if (screen == Screen::App) {
+            exitApp();
+        }
+        showFace();
+        askFace(line.substring(6));
     } else if (line == "/clear") {
         clearConversation();
     } else if (line == "/status") {
         printStatus();
     } else if (line.startsWith("/")) {
         printHelp();
+    } else if (screen == Screen::Face) {
+        askFace(line);
     } else {
         if (screen == Screen::App) {
             exitApp();
@@ -764,6 +1096,7 @@ void pollSerial()
         const char c = (char)Serial.read();
         if (c == '\n' || c == '\r') {
             if (serialLine.length() > 0) {
+                lastActivityMs = millis();
                 handleSerialCommand(serialLine);
                 serialLine = "";
             }
@@ -779,6 +1112,7 @@ void startWebPortal()
 {
     web_portal::Hooks hooks;
     hooks.saveSettings = [](const String &key, const String &model) {
+        claudeAsync.waitIdle();
         if (key.length() > 0) {
             settings.apiKey = key;
             settings_store::saveApiKey(key);
@@ -812,11 +1146,10 @@ void runPendingWebCreate()
 
 void refreshStatus()
 {
-    const String status = statusText();
     if (screen == Screen::Launcher) {
-        launcher.setStatus(status);
+        launcher.setStatus(clockText(), launcherStatusText());
     } else if (screen == Screen::Chat) {
-        chat.setStatus(status);
+        chat.setStatus(statusText());
     }
 }
 
@@ -826,6 +1159,10 @@ void chatbotSetup()
 {
     Serial.begin(kSerialBaud);
     board_hw::begin();
+    deviceCfg = settings_store::loadDevice();
+    board_hw::setFlipped(deviceCfg.flipped);
+    board_hw::setBrightnessSetting(deviceCfg.brightness);
+    board_hw::setSoundEnabled(deviceCfg.sound);
     chat.begin();
     ui::drawSplash(tft, "Claude Apps", CYD_BOARD_NAME, "Giu nut BOOT de hieu chinh cam ung");
 
@@ -843,6 +1180,7 @@ void chatbotSetup()
 
     ui::drawSplash(tft, "Claude Apps", "Dang mo bo nho app...");
     app_store::begin();
+    face.begin();
     wifi_manager::begin();
     startWebPortal();
     chat.addMessage(Speaker::System, "Xin chao! Bam \"Nhap\" de hoi Claude, hoac go cau hoi trong Serial Monitor.");
@@ -861,8 +1199,9 @@ void chatbotSetup()
     } else if (!claude.hasApiKey()) {
         notice = "Chua co API key. Mo http://" + wifi_manager::ip() + "/ tren dien thoai de nhap.";
     } else {
-        notice = "Web: http://" + wifi_manager::ip() + "/  -  giu tile 1s de sua/xoa";
+        notice = "Web: http://" + wifi_manager::ip() + "/";
     }
+    lastActivityMs = millis();
     showLauncher(notice);
 }
 
@@ -875,20 +1214,27 @@ void chatbotLoop()
     web_portal::loop();
     maintainWifi();
     runPendingWebCreate();
+    pollFaceAnswer();
 
+    const uint32_t now = millis();
+    face.loop(now);
     if (screen == Screen::App) {
         runningApp.loop();
+        canvas.refreshOverlay();
         if (runningApp.takeSaveRequest()) {
             app_store::saveState(runningAppId, runningApp.saveState().c_str());
         }
         if (runningApp.exitRequested()) {
             exitApp();
         }
+    } else if (screen == Screen::Games) {
+        games.loop(now);
     }
-    const uint32_t now = millis();
     if (now - lastStatusMs > kStatusRefreshMs) {
         lastStatusMs = now;
         refreshStatus();
     }
-    delay(screen == Screen::App ? 1 : 5);
+    maintainScreenSleep(now);
+    const bool animating = screen == Screen::App || screen == Screen::Games || screen == Screen::Face;
+    delay(animating ? 1 : 5);
 }

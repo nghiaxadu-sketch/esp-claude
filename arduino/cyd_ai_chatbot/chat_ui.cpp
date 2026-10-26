@@ -60,9 +60,9 @@ void ChatUi::begin()
 void ChatUi::drawHeader()
 {
     if (busy_) {
-        ui::drawHeader(tft_, kTitle, "Dang nghi...", kColorSystem);
+        ui::drawBackHeader(tft_, kTitle, "Dang nghi...", kColorSystem);
     } else {
-        ui::drawHeader(tft_, kTitle, status_);
+        ui::drawBackHeader(tft_, kTitle, status_);
     }
 }
 
@@ -183,7 +183,7 @@ void ChatUi::scrollToBottom()
 ChatAction ChatUi::handleTouch(int16_t x, int16_t y)
 {
     const int page = max(1, visibleLines_ - 2);
-    if (footer_[0].contains(x, y)) {
+    if (footer_[0].contains(x, y) || backTapped(x, y)) {
         return ChatAction::Home;
     }
     if (footer_[1].contains(x, y)) {

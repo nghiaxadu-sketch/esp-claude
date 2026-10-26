@@ -9,6 +9,7 @@
 #include "board_hw.h"
 #include "config.h"
 #include "device_functions.h"
+#include "ui_common.h"
 
 // Root CA bundle embedded in the arduino-esp32 core (see claude_client.cpp).
 extern const uint8_t kCaBundleStart[] asm("_binary_x509_crt_bundle_start");
@@ -80,43 +81,67 @@ std::vector<std::string> splitPath(const std::string &path)
 
 // ---------------------------------------------------------------- canvas
 
+void GfxCanvas::touched(int16_t x, int16_t y, int16_t w, int16_t h)
+{
+    const ui::Rect &b = ui::kBackHit;
+    if (x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y) {
+        overlayDirty_ = true;
+    }
+}
+
+void GfxCanvas::refreshOverlay()
+{
+    if (overlayDirty_) {
+        overlayDirty_ = false;
+        ui::drawBackBadge(gfx_);
+    }
+}
+
 void GfxCanvas::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 {
+    touched(x, y, w, h);
     gfx_.fillRect(x, y, w, h, color);
 }
 
 void GfxCanvas::drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 {
+    touched(x, y, w, h);
     gfx_.drawRect(x, y, w, h, color);
 }
 
 void GfxCanvas::fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color)
 {
+    touched(x, y, w, h);
     gfx_.fillRoundRect(x, y, w, h, r, color);
 }
 
 void GfxCanvas::drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color)
 {
+    touched(x, y, w, h);
     gfx_.drawRoundRect(x, y, w, h, r, color);
 }
 
 void GfxCanvas::fillCircle(int16_t x, int16_t y, int16_t r, uint16_t color)
 {
+    touched(x - r, y - r, 2 * r + 1, 2 * r + 1);
     gfx_.fillCircle(x, y, r, color);
 }
 
 void GfxCanvas::drawCircle(int16_t x, int16_t y, int16_t r, uint16_t color)
 {
+    touched(x - r, y - r, 2 * r + 1, 2 * r + 1);
     gfx_.drawCircle(x, y, r, color);
 }
 
 void GfxCanvas::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color)
 {
+    touched(min(x0, x1), min(y0, y1), abs(x1 - x0) + 1, abs(y1 - y0) + 1);
     gfx_.drawLine(x0, y0, x1, y1, color);
 }
 
 void GfxCanvas::drawText(int16_t x, int16_t y, const std::string &ascii, uint8_t size, uint16_t color)
 {
+    touched(x, y, (int16_t)(ascii.size() * mini_app::kFontW * size), (int16_t)(mini_app::kFontH * size));
     gfx_.setTextWrap(false);
     gfx_.setTextSize(size);
     gfx_.setTextColor(color);
@@ -140,7 +165,7 @@ void BoardDevice::reset()
 {
     board_hw::setLed(0, 0, 0);
     board_hw::stopBeep();
-    board_hw::setBacklight(LCD_BRIGHTNESS_PERCENT);
+    board_hw::setBacklight(board_hw::brightnessSetting());
 }
 
 bool BoardDevice::callFunction(const std::string &name, const std::vector<mini_script::Value> &args,

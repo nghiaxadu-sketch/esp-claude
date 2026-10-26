@@ -44,7 +44,7 @@ void WifiUi::show(const std::vector<WifiNetwork> &networks, const String &status
     visible_ = true;
     gfx_.fillScreen(kColorBg);
     gfx_.setTextWrap(false);
-    drawHeader(gfx_, kTitle, String(networks_.size()) + " mang");
+    drawBackHeader(gfx_, kTitle, String(networks_.size()) + " mang");
     drawStatus();
     drawList();
     drawButton(gfx_, footer_[0], "Ve", kColorButton, kColorWhite);
@@ -113,7 +113,7 @@ void WifiUi::drawList()
 
 WifiAction WifiUi::handleTouch(int16_t x, int16_t y)
 {
-    if (footer_[0].contains(x, y)) {
+    if (footer_[0].contains(x, y) || backTapped(x, y)) {
         return WifiAction::Back;
     }
     if (footer_[1].contains(x, y)) {

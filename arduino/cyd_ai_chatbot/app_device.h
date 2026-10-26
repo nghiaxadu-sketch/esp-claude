@@ -5,9 +5,14 @@
 
 #include "mini_app.h"
 
+// Draws apps on the TFT and keeps the round "<" back badge in the top-left corner on top of them.
 class GfxCanvas : public mini_app::Canvas {
 public:
     explicit GfxCanvas(Adafruit_GFX &gfx) : gfx_(gfx) {}
+
+    // Repaints the back badge when the app drew over it since the last call.
+    void refreshOverlay();
+    void invalidateOverlay() { overlayDirty_ = true; }
 
     void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) override;
     void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) override;
@@ -19,7 +24,10 @@ public:
     void drawText(int16_t x, int16_t y, const std::string &ascii, uint8_t size, uint16_t color) override;
 
 private:
+    void touched(int16_t x, int16_t y, int16_t w, int16_t h);
+
     Adafruit_GFX &gfx_;
+    bool overlayDirty_ = true;
 };
 
 class BoardDevice : public mini_app::Device {

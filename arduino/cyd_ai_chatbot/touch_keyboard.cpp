@@ -35,7 +35,7 @@ void TouchKeyboard::show(const char *title, const String &initial, const char *p
     shift_ = false;
     buildKeys();
     gfx_.fillScreen(kColorBg);
-    drawHeader(gfx_, ellipsize(title_, 20).c_str());
+    drawBackHeader(gfx_, ellipsize(title_, 18).c_str());
     drawButton(gfx_, cancelButton_, "Huy", kColorKeySpecial, kColorWhite);
     drawInputBox();
     drawKeys();
@@ -149,7 +149,7 @@ void TouchKeyboard::drawInputBox()
 
 KeyboardResult TouchKeyboard::handleTouch(int16_t x, int16_t y)
 {
-    if (cancelButton_.contains(x, y)) {
+    if (cancelButton_.contains(x, y) || backTapped(x, y)) {
         return KeyboardResult::Cancel;
     }
     for (size_t i = 0; i < keyCount_; ++i) {
