@@ -59,7 +59,8 @@ void TicTacToeGame::drawCell(int i)
 {
     const int16_t cx = kBoardX + (i % 3) * kCell + kCell / 2;
     const int16_t cy = kBoardY + (i / 3) * kCell + kCell / 2;
-    const bool win = winLine_ >= 0 && (kLines[winLine_][0] == i || kLines[winLine_][1] == i || kLines[winLine_][2] == i);
+    const uint8_t *line = winLine_ >= 0 ? kLines[winLine_] : nullptr;
+    const bool win = line != nullptr && (line[0] == i || line[1] == i || line[2] == i);
     if (cells_[i] == 1) {
         const uint16_t c = win ? kWinColor : kPlayerColor;
         for (int16_t t = -2; t <= 2; ++t) {

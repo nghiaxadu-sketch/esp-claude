@@ -17,17 +17,42 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
 
 ## Tính năng
 
-- **Màn hình chính (launcher)**: lưới app 3×2, nhiều trang. Chạm để mở; giữ 1 giây để **Chạy / Sửa / Xóa**.
+- **Màn hình chính (launcher)** kiểu ESP-Mosaico: icon tròn 3×2, đồng hồ góc trái, tên Wi-Fi góc phải, chấm trang ở dưới.
+  Đầu tiên là **Cài đặt, Claude (mặt AI), Chat, Trò chơi, + App**, sau đó là các app đã lưu (Đồng hồ, Hẹn giờ, Xúc xắc,
+  Bộ đếm, Thời tiết...). Đổi trang: **vuốt ngang bằng bút** hoặc chạm mũi tên `<` `>`. Giữ icon app 1 giây để **Chạy / Sửa / Xóa**.
+- **Nút back `<`** ở góc trên-trái của mọi màn hình (Cài đặt, Chat, Wi-Fi, bàn phím, trò chơi, mặt AI) và **vẽ đè lên
+  mọi app Claude viết**: chạm vào là thoát. Vẫn giữ cách cũ: giữ màn hình 1,5 giây hoặc bấm **BOOT**.
+- **Cài đặt** (giống ảnh tham khảo): AI Model (backend, model, API key, khả năng + **mã QR** mở trang web của máy,
+  chạm dòng Model để đổi Sonnet / Opus / Haiku), Wi-Fi, **Màn hình** (thanh độ sáng kéo bằng bút, xoay 0°/180°,
+  tự tắt màn sau 30 giây…10 phút hoặc không tắt), Âm thanh bật/tắt, **Hiệu chỉnh bút cảm ứng**, Thông tin thiết bị.
+  Tất cả được lưu lại sau khi tắt máy.
+- **Trò chơi** (chơi được ngay, không cần mạng):
+  - **Pong** – đấu với máy, kéo vợt bằng bút, ai được 7 điểm trước thắng. Máy chơi khó dần theo điểm của bạn.
+  - **Caro** – bàn 19×13, 5 quân liên tiếp thắng, máy tính nước tấn công/phòng thủ. Hai bên thay nhau đi trước.
+  - **Cờ XO** – đấu với máy, mức **Dễ** hoặc **Khó** (không thể thua).
+  - **Phá gạch** – kéo thanh đỡ bằng bút, 3 mạng, lên màn tăng tốc, lưu kỷ lục.
+  - **Con rắn** – chạm phía muốn rẽ (trên/dưới hoặc trái/phải đầu rắn), lưu kỷ lục.
+  - **Vẽ tranh** – bảng vẽ cho bút: 7 màu, tẩy, 3 cỡ nét, xóa trang.
+- **Claude (mặt AI)**: khuôn mặt robot có **mắt, miệng và biểu cảm** (vui, buồn, giận, ngạc nhiên, yêu, suy nghĩ,
+  buồn ngủ, nháy mắt). Mắt tự chớp, liếc quanh; chạm vào mặt thì phản ứng, chọc vào mắt thì "giận"; để lâu không
+  dùng thì buồn ngủ rồi ngủ (có chữ z z z), chạm để đánh thức. Bấm **Nói chuyện**, gõ câu hỏi: trong lúc Claude
+  nghĩ, mặt vẫn chuyển động (gọi API ở luồng nền); trả lời hiện phụ đề từng chữ, miệng mấp máy theo, loa phát
+  tiếng "robot" (tắt được). Claude tự chọn biểu cảm hợp với câu trả lời. Hội thoại nhớ 8 tin gần nhất.
 - **+ App**: gõ mô tả trên bàn phím cảm ứng (không dấu cũng được) → Claude viết app → máy chạy thử
   (khởi động, vài nhịp timer, bấm thử từng nút). Nếu lỗi, máy gửi lỗi lại cho Claude sửa (tối đa 2 lần) rồi mới lưu.
 - **Sửa app**: mô tả thay đổi ("thêm nút 10 phút", "đổi màu xanh"). Nếu app vừa bị lỗi lúc chạy, lỗi đó được gửi kèm.
-- **Thoát app**: giữ màn hình 1,5 giây, hoặc bấm nút **BOOT**.
-- **Wi-Fi**: nút **Wi-Fi** quét các mạng xung quanh (vạch sóng, `**` = có mật khẩu), chạm vào mạng → nhập mật khẩu
+- **Thoát app**: chạm `<` góc trên-trái, giữ màn hình 1,5 giây, hoặc bấm nút **BOOT**.
+- **Wi-Fi** (Cài đặt > Wi-Fi): quét các mạng xung quanh (vạch sóng, `**` = có mật khẩu), chạm vào mạng → nhập mật khẩu
   → **Noi**. Kết nối được thì lưu lại. Lần đầu chưa có Wi-Fi thì máy tự mở màn này. Mất mạng thì tự nối lại ở nền.
 - **Trang web trên máy** `http://<IP của máy>/` (IP hiện trên màn hình chính): dán API key, đổi model,
   **tạo app bằng điện thoại** (gõ tiếng Việt có dấu thoải mái), cài app từ JSON, xem JSON các app.
 - **Chat**: như bản cũ (nút **Chat**), nhớ 10 tin gần nhất. Trả lời giờ được *stream* nên không còn bị timeout.
-- 4 app mẫu cài sẵn: Đồng hồ, Hẹn giờ, Xúc xắc, Bộ đếm (cũng là ví dụ cho Claude bắt chước).
+- 5 app mẫu cài sẵn: Đồng hồ, Hẹn giờ, Xúc xắc, Bộ đếm và **Thời tiết** (nhiệt độ lớn, trạng thái trời, dự báo
+  5 ngày cho Hải Phòng từ Open-Meteo, không cần API key). Máy đã có app từ bản cũ sẽ được cài thêm app mới còn thiếu.
+- **Màn hình bút cảm ứng**: CYD dùng cảm ứng điện trở nên chạm bằng bút (que nhựa) chính xác nhất. Máy nhận cả
+  thao tác **kéo** (vợt Pong, thanh đỡ, thanh độ sáng, vẽ) và **vuốt** (đổi trang). Chạm lệch thì vào
+  Cài đặt > Bút cảm ứng để hiệu chỉnh lại. Màn hình tự tắt khi không dùng; chạm bất kỳ đâu để bật lại
+  (lần chạm đó không bấm nhầm nút nào).
 - Đèn RGB: xanh dương là đang nghĩ, xanh lá là xong, đỏ là lỗi. App có thể tự điều khiển đèn, loa (ESP32-2432S028R
   có cổng loa `SPEAK`), cảm biến ánh sáng, độ sáng màn, đồng hồ NTP và gọi API JSON qua HTTPS (thời tiết...).
 
@@ -88,9 +113,10 @@ Partition mặc định chỉ có 1.2MB cho app, **không đủ**. Nhớ đổi 
 | `/new mo ta app` | Claude viết app mới |
 | `/apps`, `/run ID`, `/del ID` | Danh sách / chạy / xóa app |
 | `/cal` | Hiệu chỉnh cảm ứng |
+| `/face loi muon noi` | Mở mặt Claude và nói chuyện |
 | `/clear` | Xóa hội thoại |
 | `/status` | Xem Wi-Fi, model, số app, RAM |
-| chữ bình thường | Hỏi Claude |
+| chữ bình thường | Hỏi Claude (đang ở mặt Claude thì mặt trả lời) |
 
 ## App được viết thế nào
 
@@ -98,6 +124,7 @@ Mỗi app là một file JSON (`/apps/<id>.json` trên flash): danh sách biến
 (`label`, `button`, `rect`, `circle`, `line`, `bar`). Logic viết bằng một ngôn ngữ script nhỏ kiểu C
 (`t -= 1; if (t == 0) { beep(1000, 600); led(255,0,0) }`), không có vòng lặp nên app không bao giờ treo máy.
 Toàn bộ quy tắc gửi cho Claude nằm trong `app_builder.cpp` (`kAppFormatGuide`); app mẫu ở `builtin_apps.cpp`.
+Góc trên-trái (x < 44, y < 32) dành cho nút `<`, Claude được dặn để trống góc này.
 Biến khai báo trong `"persist"` (điểm cao, bộ đếm...) được lưu lại giữa các lần mở app.
 
 ## Model và chi phí
@@ -119,7 +146,12 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | `CLAUDE_EFFORT` / `CLAUDE_APP_EFFORT` | Mức suy nghĩ khi chat / khi viết app |
 | `APP_REPAIR_ROUNDS` | Số lần Claude được sửa app bị máy từ chối |
 | `APP_EXIT_HOLD_MS` | Giữ màn hình bao lâu thì thoát app |
-| `APP_LOCATION_TEXT` | Vị trí cho app thời tiết (mặc định Hải Phòng) |
+| `APP_LOCATION_TEXT` | Vị trí cho app thời tiết Claude viết (mặc định Hải Phòng) |
+| `SCREEN_OFF_DEFAULT_SEC` | Tự tắt màn sau bao lâu khi chưa chỉnh trong Cài đặt (mặc định 120 giây) |
+| `FACE_EFFORT`, `FACE_MAX_TOKENS` | Mức suy nghĩ / số token khi mặt Claude trả lời |
+| `FACE_HISTORY_MAX_MESSAGES` | Số tin mặt Claude nhớ |
+| `FACE_VOICE_BLIPS` | `1` = phát tiếng "robot" khi mặt nói (cần loa) |
+| `FACE_SLEEP_AFTER_MS` | Không chạm bao lâu thì mặt buồn ngủ (thêm 30 giây nữa thì ngủ) |
 | `WEB_PORTAL_ENABLED` | Bật/tắt trang web trên máy |
 | `SPEAKER_ENABLED`, `RGB_LED_ENABLED`, `RGB_LED_LEVEL` | Loa, đèn RGB và độ sáng đèn |
 
@@ -143,8 +175,12 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | File | Nội dung |
 |---|---|
 | `cyd_ai_chatbot.ino` | Điểm vào, gọi `chatbotSetup()` / `chatbotLoop()` |
-| `chatbot_app.cpp` | Luồng chính: launcher, chat, Wi-Fi, tạo/chạy app, lệnh Serial |
-| `launcher_ui.cpp`, `chat_ui.cpp`, `wifi_ui.cpp`, `touch_keyboard.cpp`, `ui_common.cpp` | Các màn hình |
+| `chatbot_app.cpp` | Luồng chính: chuyển màn hình, chạm/kéo/vuốt, tắt màn, tạo/chạy app, lệnh Serial |
+| `launcher_ui.cpp`, `ui_icons.cpp` | Màn hình chính, icon tròn vẽ bằng GFX |
+| `settings_ui.cpp`, `qr_code.cpp` | Cài đặt (AI Model + QR, Màn hình, Thiết bị), bộ mã hóa QR |
+| `games_ui.cpp`, `game.cpp`, `game_*.cpp` | Menu trò chơi và 6 trò (Pong, Caro, XO, Phá gạch, Rắn, Vẽ) |
+| `face_ui.cpp`, `claude_async.cpp` | Mặt Claude (canvas 1-bit, đẩy 1 lần qua SPI nên không nháy) và gọi Claude ở luồng nền |
+| `chat_ui.cpp`, `wifi_ui.cpp`, `touch_keyboard.cpp`, `ui_common.cpp` | Chat, Wi-Fi, bàn phím, phần vẽ dùng chung (header có nút `<`) |
 | `mini_json.cpp`, `mini_script.cpp`, `mini_app.cpp` | Bộ chạy app (C++ thuần, có test trên PC) |
 | `app_validator.cpp` | Kiểm tra + chạy thử app trước khi lưu |
 | `app_builder.cpp` | Prompt cho Claude và vòng tự sửa lỗi |
@@ -154,7 +190,7 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | `wifi_manager.cpp` | Quét và kết nối Wi-Fi |
 | `web_portal.cpp` | Trang web cài đặt / tạo app |
 | `board_hw.cpp`, `board_pins.h`, `touch_xpt2046.cpp` | Phần cứng từng board |
-| `settings_store.cpp`, `text_utils.cpp`, `config.h` | Lưu cài đặt NVS, xử lý chữ, cấu hình |
+| `settings_store.cpp`, `text_utils.cpp`, `config.h` | Lưu cài đặt NVS (cả độ sáng, xoay, tắt màn, âm thanh, kỷ lục game), xử lý chữ, cấu hình |
 
 Test trên PC (không cần board), chạy trong thư mục `test/`:
 
@@ -162,7 +198,8 @@ Test trên PC (không cần board), chạy trong thư mục `test/`:
 g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test && ./text_utils_test
 g++ -std=c++17 -Wall -Wextra -Werror -I.. ../mini_json.cpp ../mini_script.cpp ../mini_app.cpp ../text_utils.cpp \
     ../builtin_apps.cpp ../app_validator.cpp mini_app_test.cpp -o mini_app_test && ./mini_app_test
+g++ -std=c++17 -Wall -Wextra -Werror -I.. ../qr_code.cpp qr_code_test.cpp -o qr_code_test && ./qr_code_test
 ```
 
-CI: `.github/workflows/build-cyd-chatbot.yml` chạy 2 test trên và compile bằng arduino-cli cho 3 cấu hình
+CI: `.github/workflows/build-cyd-chatbot.yml` (ở gốc repo) chạy 3 test trên và compile bằng arduino-cli cho 3 cấu hình
 (ESP32-2432S028R ST7789, ESP32-2432S028R ILI9341, NM-CYD-C5). File `.merged.bin` có trong Artifacts.

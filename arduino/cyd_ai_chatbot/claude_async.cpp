@@ -30,7 +30,8 @@ void ClaudeAsync::taskMain(void *arg)
 {
     ClaudeAsync *self = static_cast<ClaudeAsync *>(arg);
     String reply, error;
-    const bool ok = self->client_.ask(self->systemPrompt_, self->history_, self->maxTokens_, self->effort_, reply, error);
+    const bool ok =
+        self->client_.ask(self->systemPrompt_, self->history_, self->maxTokens_, self->effort_, reply, error);
     self->ok_ = ok;
     self->reply_ = reply;
     self->error_ = error;

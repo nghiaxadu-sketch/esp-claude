@@ -76,6 +76,7 @@ constexpr const char *kFaceSystemPrompt =
 
 // Models offered by Settings > AI Model (tap to switch).
 constexpr const char *kModels[] = {"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"};
+
 enum class Screen : uint8_t { Launcher, Chat, Keyboard, Wifi, App, Busy, Settings, Games, Face };
 enum class InputPurpose : uint8_t { ChatQuestion, NewApp, EditApp, WifiPassword, FaceQuestion };
 
@@ -99,6 +100,7 @@ std::vector<ChatMessage> history;
 std::vector<ChatMessage> faceHistory;
 
 Screen screen = Screen::Launcher;
+Screen pressScreen = Screen::Launcher;  // screen that received the current press
 InputPurpose inputPurpose = InputPurpose::ChatQuestion;
 std::vector<AppTile> tiles;
 std::vector<WifiNetwork> scanResults;
@@ -353,13 +355,12 @@ void trimHistory()
 
 void askClaude(const String &question)
 {
-    claudeAsync.waitIdle();  // the face may still be waiting for its answer
     if (screen != Screen::Chat) {
         showChat();
     }
     chat.addMessage(Speaker::User, question);
     if (!wifi_manager::connected()) {
-        chat.addMessage(Speaker::System, "Chua co Wi-Fi. Bam \"Ve\" > \"Wi-Fi\" de chon mang.");
+        chat.addMessage(Speaker::System, "Chua co Wi-Fi. Vao Cai dat > Wi-Fi de chon mang.");
         board_hw::setLed(255, 0, 0);
         return;
     }
@@ -369,6 +370,7 @@ void askClaude(const String &question)
 
     chat.setBusy(true);
     board_hw::setLed(0, 0, 255);
+    claudeAsync.waitIdle();  // the face may still be waiting for its answer
     String reply, error;
     const bool ok = claude.ask(kChatSystemPrompt, history, CLAUDE_MAX_TOKENS, CLAUDE_EFFORT, reply, error);
     chat.setBusy(false);
@@ -570,9 +572,8 @@ String appNameOf(const String &json)
 // Creates a new app (editId empty) or changes an existing one, then runs it.
 void buildApp(const String &request, const String &editId)
 {
-    claudeAsync.waitIdle();
     if (!wifi_manager::connected()) {
-        showLauncher("Can Wi-Fi de Claude viet app. Bam \"Wi-Fi\".");
+        showLauncher("Can Wi-Fi de Claude viet app: Cai dat > Wi-Fi.");
         return;
     }
     if (!claude.hasApiKey()) {
@@ -598,6 +599,7 @@ void buildApp(const String &request, const String &editId)
         tft.print(line);
     };
 
+    claudeAsync.waitIdle();  // one Claude request at a time
     String json, error;
     bool ok;
     if (editId.length() > 0) {
@@ -870,7 +872,8 @@ void onRelease()
 // dx is how far the stylus moved sideways: a swipe changes the page instead of opening an icon.
 void onTap(int16_t x, int16_t y, int16_t dx)
 {
-    if (screen != Screen::Launcher) {
+    // A press that brought us here (e.g. "<" in Settings) must not also open an icon when it lifts.
+    if (screen != Screen::Launcher || pressScreen != Screen::Launcher) {
         return;
     }
     if (launcher.menuVisible()) {
@@ -941,6 +944,7 @@ void pollTouch()
             pressX = lastX = x;
             pressY = lastY = y;
             pressStartMs = now;
+            pressScreen = screen;
             onPress(x, y);
             return;
         }
@@ -950,7 +954,7 @@ void pollTouch()
             onDrag(x, y);
         }
         const bool stayed = abs(lastX - pressX) < kHoldSlopPx && abs(lastY - pressY) < kHoldSlopPx;
-        if (!longFired && stayed && now - pressStartMs >= longPressMs() &&
+        if (!longFired && stayed && now - pressStartMs >= longPressMs() && pressScreen == screen &&
             (screen == Screen::App || screen == Screen::Launcher)) {
             longFired = true;
             onLongPress(pressX, pressY);
@@ -1195,7 +1199,7 @@ void chatbotSetup()
     }
     String notice;
     if (!wifiOk) {
-        notice = "Khong vao duoc Wi-Fi " + ui::toAscii(settings.wifiSsid) + ". Bam \"Wi-Fi\" de chon mang khac.";
+        notice = "Khong vao duoc Wi-Fi " + ui::toAscii(settings.wifiSsid) + ". Vao Cai dat > Wi-Fi de chon mang khac.";
     } else if (!claude.hasApiKey()) {
         notice = "Chua co API key. Mo http://" + wifi_manager::ip() + "/ tren dien thoai de nhap.";
     } else {

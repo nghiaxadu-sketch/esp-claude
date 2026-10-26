@@ -26,12 +26,18 @@ struct Pen {
     int16_t s(int16_t v) const { return (int16_t)((int32_t)v * r / kDesignRadius); }
     int16_t x(int16_t v) const { return cx + s(v); }
     int16_t y(int16_t v) const { return cy + s(v); }
-    void rect(int16_t x0, int16_t y0, int16_t w, int16_t h, uint16_t c) const { g.fillRect(x(x0), y(y0), s(w), s(h), c); }
+    void rect(int16_t x0, int16_t y0, int16_t w, int16_t h, uint16_t c) const
+    {
+        g.fillRect(x(x0), y(y0), s(w), s(h), c);
+    }
     void round(int16_t x0, int16_t y0, int16_t w, int16_t h, int16_t rad, uint16_t c) const
     {
         g.fillRoundRect(x(x0), y(y0), s(w), s(h), max<int16_t>(1, s(rad)), c);
     }
-    void dot(int16_t x0, int16_t y0, int16_t rad, uint16_t c) const { g.fillCircle(x(x0), y(y0), max<int16_t>(1, s(rad)), c); }
+    void dot(int16_t x0, int16_t y0, int16_t rad, uint16_t c) const
+    {
+        g.fillCircle(x(x0), y(y0), max<int16_t>(1, s(rad)), c);
+    }
     void ring(int16_t x0, int16_t y0, int16_t rad, uint16_t c) const { g.drawCircle(x(x0), y(y0), s(rad), c); }
     void tri(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t c) const
     {

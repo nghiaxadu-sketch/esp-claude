@@ -295,6 +295,10 @@ bool bootButtonHeldAtStart(uint32_t windowMs)
 
 void runTouchCalibration()
 {
+    TouchRaw sample;
+    while (touchPanel.readRaw(sample)) {  // the tap that started the calibration must lift first
+        delay(10);
+    }
     while (true) {
         const int16_t left = kCalMargin, right = ui::kScreenW - kCalMargin;
         const int16_t top = kCalMargin, bottom = ui::kScreenH - kCalMargin;
