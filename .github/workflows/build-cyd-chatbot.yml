@@ -42,12 +42,18 @@ jobs:
             --output-dir build arduino/cyd_ai_chatbot
           ls -la build
 
+      - name: Compile Wi-Fi Dead Zone Finder
+        run: |
+          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
+            --output-dir build_deadzone arduino/wifi_deadzone_cyd_c5
+
       - uses: actions/upload-artifact@v4
         with:
           name: cyd-ai-chatbot-nm_cyd_c5
           path: |
             build/cyd_ai_chatbot.ino.merged.bin
             build/cyd_ai_chatbot.ino.bin
+            build_deadzone/wifi_deadzone_cyd_c5.ino.merged.bin
 
       - name: Compile Wi-Fi Dead Zone Finder cho NM-CYD-C5
         run: |
