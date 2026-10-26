@@ -47,6 +47,12 @@ jobs:
           arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
             --output-dir build_deadzone arduino/wifi_deadzone_cyd_c5
 
+      - name: Compile Wi-Fi Dead Zone Finder (secrets.h giả chỉ để build)
+        run: |
+          cp arduino/c3_wifi_deadzone_cyd/secrets.h.example arduino/c3_wifi_deadzone_cyd/secrets.h
+          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
+            --output-dir build_deadzone arduino/c3_wifi_deadzone_cyd
+
       - uses: actions/upload-artifact@v4
         with:
           name: cyd-ai-chatbot-nm_cyd_c5
@@ -65,4 +71,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: wifi-deadzone-nm_cyd_c5
+          path: build_deadzone/c3_wifi_deadzone_cyd.ino.merged.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyd-wifi-deadzone-nm_cyd_c5
           path: build_deadzone/c3_wifi_deadzone_cyd.ino.merged.bin

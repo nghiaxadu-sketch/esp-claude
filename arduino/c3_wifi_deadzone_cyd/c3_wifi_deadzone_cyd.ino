@@ -1,26 +1,18 @@
 // Dự án #3 (bản CYD) - Wi-Fi Dead Zone Finder trên màn 2.8"
-// Board: RockBase-iot NM-CYD-C5 (ESP32-C5). Copy secrets.h.example -> secrets.h rồi điền Wi-Fi.
-// Arduino IDE: ESP32C5 Dev Module, Flash 16MB, Partition "16M Flash (3MB APP/9.9MB FATFS)",
-// USB CDC On Boot "Enabled". Thư viện: Adafruit GFX Library, Adafruit ST7735 and ST7789 Library.
+// Board: RockBase-iot NM-CYD-C5 (ESP32-C5, Wi-Fi 6 hai băng tần 2.4/5 GHz). Copy secrets.h.example -> secrets.h rồi điền Wi-Fi.
+// Bản gốc cho ESP32-2432S028: chỉ đổi cyd.h (chân/driver màn), cổng loa và dòng hiển thị kênh.
 #include <WiFi.h>
-#include "cyd_c5.h"
+#include "cyd.h"
 #include "secrets.h"            // WIFI_SSID, WIFI_PASS (không commit file này)
 
-// NM-CYD-C5 không có loa. Nếu gắn loa/buzzer vào một chân trống ở header P1, điền số GPIO vào đây.
-// -1 = tắt tiếng bíp (đèn RGB vẫn báo).
-const int8_t SPEAKER_PIN = -1;
+const int8_t SPEAKER_PIN = -1;  // NM-CYD-C5 không có loa sẵn. Gắn buzzer vào GPIO trống ở header P1 rồi điền số chân (-1 = tắt)
 const int DEAD_ZONE_DBM = -80;
-const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
 
 // Trung bình trượt 10 mẫu để số không nhảy loạn
 const int N = 10;
 int samples[N];
 int idx = 0, count = 0;
 bool wasConnected = false;
-
-void beep(unsigned int freq, unsigned long durationMs) {
-  if (SPEAKER_PIN >= 0) tone(SPEAKER_PIN, freq, durationMs);
-}
 
 int averageRssi(int v) {
   samples[idx] = v;
@@ -46,6 +38,10 @@ uint16_t levelColor(int r) {
   return C_RED;
 }
 
+void beep(unsigned int freq, unsigned long ms) {
+  if (SPEAKER_PIN >= 0) tone(SPEAKER_PIN, freq, ms);
+}
+
 void connectWifi() {
   tft.setTextSize(2);
   tft.setTextColor(C_WHITE, C_BLACK);
@@ -54,7 +50,7 @@ void connectWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   uint32_t t0 = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - t0 < WIFI_CONNECT_TIMEOUT_MS) delay(250);
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 15000) delay(250);
 }
 
 void drawStatic() {
@@ -115,19 +111,16 @@ void loop() {
   tft.fillRect(10, 170, bar, 24, color);
   tft.fillRect(10 + bar, 170, 300 - bar, 24, C_DARK);
 
-  // ESP32-C5 có Wi-Fi 2.4GHz và 5GHz: kênh > 14 là băng 5GHz.
-  int channel = WiFi.channel();
-  char info[27];
-  snprintf(info, sizeof(info), "K%3d %s Tuc thoi%4d    ", channel, channel > 14 ? "5GHz" : "2.4G", raw);
   tft.setTextSize(2);
   tft.setTextColor(C_WHITE, C_BLACK);
   tft.setCursor(10, 210);
-  tft.print(info);
+  int ch = WiFi.channel();                   // C5 có cả băng 5 GHz (kênh 36...165)
+  tft.printf("Kenh %3d %s Tuc thoi %4d", ch, ch > 14 ? "5G" : "2G", raw);
 
   if (avg >= -60) rgb(false, true, false);
   else if (avg >= DEAD_ZONE_DBM) rgb(true, true, false);
   else { rgb(true, false, false); beep(2000, 80); }
 
-  Serial.printf("RSSI=%d avg=%d ch=%d\n", raw, avg, channel);
+  Serial.printf("RSSI=%d avg=%d\n", raw, avg);
   delay(300);
 }
