@@ -142,6 +142,8 @@ The firmware uses two logical filesystem roots, configured at boot through `claw
   JSON apps + MiniScript interpreter, touch Wi-Fi scan/connect, web portal). It is not part of the ESP-IDF `edge_agent` build.
 - Sketch checks: host tests in `application/cyd_ai_chatbot/test/` and CI `.github/workflows/build-cyd-chatbot.yml`
   (arduino-cli compile for both boards). Keep the app engine (`mini_*.cpp`, `app_validator.cpp`) free of Arduino types.
+- The sketch is ~1.4MB: Arduino needs Tools -> Partition Scheme = "Huge APP (3MB)" (a sketch-level `partitions.csv` does NOT bypass the size check; tried and reverted).
+  Owner flashes from Windows (COM5); "Access is denied" on the port means Serial Monitor or another program holds it.
 - The owner reads Vietnamese; on-device text is ASCII Vietnamese without diacritics (built-in GFX font).
 
 ## Common File Locations
