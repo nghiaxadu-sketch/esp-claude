@@ -29,6 +29,12 @@ File đã sửa: `components/claw_modules/claw_core/src/llm/backends/claw_llm_ba
 `components/claw_capabilities/cap_llm_config/src/cap_llm_config.c`, 2 trang `LlmPage.tsx` /
 `SetupWizardPage.tsx` (kèm `dist/index.html.gz` build lại), cùng test `claw_core/test_host/test_anthropic_backend.c`.
 
+## Board CYD 2.8" (ESP32-2432S028R / NM-CYD-C5)
+
+Có bản riêng cho màn Cheap Yellow Display 320×240, viết bằng Arduino: `application/cyd_ai_chatbot/`.
+Mô tả app bằng lời → Claude viết → máy chạy luôn, có chat, quét Wi-Fi trên màn cảm ứng và trang web cài đặt.
+Hướng dẫn: [`application/cyd_ai_chatbot/README.md`](application/cyd_ai_chatbot/README.md).
+
 ## Phần cứng nên mua
 
 | Board | Ghi chú |

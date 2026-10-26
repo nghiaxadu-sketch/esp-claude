@@ -1,0 +1,68 @@
+name: Build CYD Claude Apps (Arduino)
+
+on:
+  push:
+    paths:
+      - "application/cyd_ai_chatbot/**"
+      - ".github/workflows/build-cyd-chatbot.yml"
+  workflow_dispatch:
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: application/cyd_ai_chatbot/test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test text_utils (chạy trên máy CI, không cần board)
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test
+          ./text_utils_test
+      - name: Test bộ chạy app (JSON, script, app mẫu, kiểm tra app)
+        run: |
+          g++ -std=c++17 -g -fsanitize=address,undefined -Wall -Wextra -Werror -I.. \
+            ../mini_json.cpp ../mini_script.cpp ../mini_app.cpp ../text_utils.cpp ../builtin_apps.cpp \
+            ../app_validator.cpp mini_app_test.cpp -o mini_app_test
+          ./mini_app_test
+
+  compile:
+    needs: host-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cyd-esp32-2432s028r-st7789
+            fqbn: esp32:esp32:esp32:PartitionScheme=huge_app
+            flags: ""
+          - name: cyd-esp32-2432s028r-ili9341
+            fqbn: esp32:esp32:esp32:PartitionScheme=huge_app
+            flags: "-DCYD_DISPLAY_ST7789=0"
+          - name: nm-cyd-c5
+            fqbn: esp32:esp32:esp32c5:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=enabled,CDCOnBoot=cdc
+            flags: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cài core ESP32 và thư viện
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib install "Adafruit ILI9341" "Adafruit ST7735 and ST7789 Library" "Adafruit GFX Library" "ArduinoJson"
+
+      - name: Compile
+        run: |
+          arduino-cli compile --fqbn "${{ matrix.fqbn }}" --warnings default \
+            --build-property "compiler.cpp.extra_flags=${{ matrix.flags }}" \
+            --export-binaries application/cyd_ai_chatbot
+          ls -la application/cyd_ai_chatbot/build/*/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: application/cyd_ai_chatbot/build/*/cyd_ai_chatbot.ino.merged.bin

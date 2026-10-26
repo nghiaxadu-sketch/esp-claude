@@ -134,6 +134,16 @@ The firmware uses two logical filesystem roots, configured at boot through `claw
 - Lua module tests live beside modules under `components/lua_modules/<module>/test/` with descriptive names such as `json_roundtrip.lua`.
 - Embedded frontend changes should run `cd application/edge_agent/components/http_server/frontend_source && pnpm build` and `pnpm typecheck`.
 
+## Owner's Hardware (remember across sessions)
+
+- The repo owner's real board is a 2.8" 320x240 "Cheap Yellow Display": the sketch defaults to the
+  **ESP32-2432S028R USB-C version (ST7789)** and also supports the **RockBase-iot NM-CYD-C5** (ask which one if it matters). Resistive XPT2046 touch, RGB LED, no PSRAM on the ESP32 one.
+- For that board, use the Arduino sketch `application/cyd_ai_chatbot/` ("Claude Apps": ESP-Mosaico-style chat-to-app,
+  JSON apps + MiniScript interpreter, touch Wi-Fi scan/connect, web portal). It is not part of the ESP-IDF `edge_agent` build.
+- Sketch checks: host tests in `application/cyd_ai_chatbot/test/` and CI `.github/workflows/build-cyd-chatbot.yml`
+  (arduino-cli compile for both boards). Keep the app engine (`mini_*.cpp`, `app_validator.cpp`) free of Arduino types.
+- The owner reads Vietnamese; on-device text is ASCII Vietnamese without diacritics (built-in GFX font).
+
 ## Common File Locations
 
 - App entry point: `application/edge_agent/main/main.c`
