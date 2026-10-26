@@ -3,7 +3,7 @@ name: Build CYD AI Chatbot (Arduino)
 on:
   push:
     paths:
-      - "arduino/cyd_ai_chatbot/**"
+      - "arduino/**"
       - ".github/workflows/build-cyd-chatbot.yml"
   workflow_dispatch:
 
@@ -48,3 +48,15 @@ jobs:
           path: |
             build/cyd_ai_chatbot.ino.merged.bin
             build/cyd_ai_chatbot.ino.bin
+
+      - name: Compile Wi-Fi Dead Zone Finder cho NM-CYD-C5
+        run: |
+          cp arduino/c3_wifi_deadzone_cyd/secrets.h.example arduino/c3_wifi_deadzone_cyd/secrets.h
+          arduino-cli compile --fqbn "$FQBN" --warnings default --export-binaries \
+            --output-dir build_deadzone arduino/c3_wifi_deadzone_cyd
+          ls -la build_deadzone
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wifi-deadzone-nm_cyd_c5
+          path: build_deadzone/c3_wifi_deadzone_cyd.ino.merged.bin
