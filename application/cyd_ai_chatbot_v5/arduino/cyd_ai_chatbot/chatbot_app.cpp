@@ -2,6 +2,7 @@
 // (kept out of the .ino so Arduino's prototype generator leaves it alone).
 
 #include <WiFi.h>
+#include <esp_system.h>
 #include <map>
 #include <time.h>
 
@@ -17,6 +18,7 @@
 #include "claude_client.h"
 #include "config.h"
 #include "face_ui.h"
+#include "firmware_version.h"
 #include "games_ui.h"
 #include "launcher_ui.h"
 #include "map_ui.h"
@@ -204,6 +206,23 @@ void showLauncher(const String &notice = String())
     launcher.show(tiles);
 }
 
+// Short ASCII reason for the last restart; a crash or watchdog here points at a firmware bug.
+String resetReasonText()
+{
+    switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "bat nguon";
+    case ESP_RST_SW: return "khoi dong lai (lenh)";
+    case ESP_RST_PANIC: return "LOI (crash)";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT: return "LOI (watchdog)";
+    case ESP_RST_BROWNOUT: return "sut ap nguon";
+    case ESP_RST_DEEPSLEEP: return "thuc day";
+    case ESP_RST_EXT: return "nut RST";
+    default: return "khac (" + String((int)esp_reset_reason()) + ")";
+    }
+}
+
 SettingsInfo settingsInfo()
 {
     SettingsInfo info;
@@ -215,6 +234,8 @@ SettingsInfo settingsInfo()
     info.board = CYD_BOARD_NAME;
     info.hasSpeaker = board_hw::hasSpeaker();
     info.freeHeap = ESP.getFreeHeap();
+    info.maxHeapBlock = ESP.getMaxAllocHeap();
+    info.resetReason = resetReasonText();
     info.freePsram = ESP.getFreePsram();
     info.appCount = app_store::list().size();
     info.uptimeSec = millis() / 1000;
@@ -1061,11 +1082,13 @@ void printHelp()
 
 void printStatus()
 {
+    Serial.printf("%s %s, khoi dong do: %s\n", FW_NAME, FW_VERSION, resetReasonText().c_str());
     Serial.printf("Board: %s\n", CYD_BOARD_NAME);
     Serial.printf("Wi-Fi: %s\n", wifiStatusText().c_str());
     Serial.printf("Model: %s, API key: %s\n", claude.model().c_str(), claude.hasApiKey() ? "da co" : "CHUA CO");
     Serial.printf("Apps: %u, file system: %s\n", (unsigned)app_store::list().size(), app_store::ready() ? "ok" : "LOI");
-    Serial.printf("Heap: %u, PSRAM: %u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram());
+    Serial.printf("Heap: %u (max block %u, min ever %u), PSRAM: %u\n", (unsigned)ESP.getFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap(), (unsigned)ESP.getMinFreeHeap(), (unsigned)ESP.getFreePsram());
 }
 
 void handleSerialCommand(String line)
@@ -1211,13 +1234,14 @@ void refreshStatus()
 void chatbotSetup()
 {
     Serial.begin(kSerialBaud);
+    Serial.printf("\n%s %s (%s) - khoi dong do: %s\n", FW_NAME, FW_VERSION, CYD_BOARD_NAME, resetReasonText().c_str());
     board_hw::begin();
     deviceCfg = settings_store::loadDevice();
     board_hw::setFlipped(deviceCfg.flipped);
     board_hw::setBrightnessSetting(deviceCfg.brightness);
     board_hw::setSoundEnabled(deviceCfg.sound);
     chat.begin();
-    ui::drawSplash(tft, "Claude Apps", CYD_BOARD_NAME, "Giu nut BOOT de hieu chinh cam ung");
+    ui::drawSplash(tft, FW_NAME " " FW_VERSION, CYD_BOARD_NAME, "Giu nut BOOT de hieu chinh cam ung");
 
     settings = settings_store::load();
     claude.configure(settings.apiKey, settings.model);

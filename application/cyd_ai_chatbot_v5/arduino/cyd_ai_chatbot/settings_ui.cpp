@@ -1,5 +1,7 @@
 #include "settings_ui.h"
 
+#include "firmware_version.h"
+
 namespace {
 
 using namespace ui;
@@ -325,14 +327,16 @@ void SettingsUi::drawAbout()
         y += 18;
     };
     line("Board", info_.board);
-    line("Phan mem", "Claude Apps 2.0");
+    line("Phan mem", FW_NAME " " FW_VERSION);
     line("Wi-Fi", info_.wifiConnected ? info_.ssid + "  " + info_.ip : String("chua ket noi"));
     line("Model", info_.model);
     line("App da luu", String((unsigned)info_.appCount));
-    line("RAM trong", String(info_.freeHeap / 1024) + " KB");
+    line("RAM trong", String(info_.freeHeap / 1024) + " KB (khoi lon nhat " + String(info_.maxHeapBlock / 1024) +
+                          " KB)");
     line("PSRAM trong", info_.freePsram > 0 ? String(info_.freePsram / 1024) + " KB" : String("khong co"));
     line("Da chay", uptimeText(info_.uptimeSec));
     line("Loa", info_.hasSpeaker ? "co" : "khong");
+    line("Khoi dong do", info_.resetReason);
     drawCentered(gfx_, "Lenh Serial: /status /help", 0, kScreenW, 216, 1, kColorMuted);
 }
 

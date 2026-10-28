@@ -6,6 +6,7 @@
 #include "app_store.h"
 #include "board_pins.h"
 #include "config.h"
+#include "firmware_version.h"
 
 namespace web_portal {
 namespace {
@@ -55,7 +56,7 @@ void sendMessage(const String &title, const String &text)
 
 void handleRoot()
 {
-    String body = "<h1>Claude Apps</h1><p class=\"muted\">";
+    String body = "<h1>Claude Apps</h1><p class=\"muted\">v" FW_VERSION " &middot; ";
     body += CYD_BOARD_NAME;
     body += " &middot; ";
     body += WiFi.localIP().toString();

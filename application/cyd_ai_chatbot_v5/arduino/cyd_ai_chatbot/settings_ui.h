@@ -20,9 +20,11 @@ struct SettingsInfo {
     String board;
     bool hasSpeaker = false;
     uint32_t freeHeap = 0;
+    uint32_t maxHeapBlock = 0;  // largest free block: a TLS connection needs ~24 KB in one piece
     uint32_t freePsram = 0;
     size_t appCount = 0;
     uint32_t uptimeSec = 0;
+    String resetReason;  // why the board last restarted (power on, crash, watchdog...)
 };
 
 enum class SettingsAction : uint8_t {
