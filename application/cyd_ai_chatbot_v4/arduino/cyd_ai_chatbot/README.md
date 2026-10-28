@@ -204,6 +204,7 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | `bricks_levels.cpp` | Các màn Phá gạch: 20 màn vẽ sẵn + sinh màn mới không trùng (C++ thuần, có test) |
 | `map_ui.cpp`, `route_client.cpp` | Bản đồ chỉ đường: màn nhập/vẽ tuyến, gọi Photon + OSRM, giải mã polyline |
 | `map_tiles.cpp` | Nền bản đồ: tải tile OSM vào flash, giải mã PNG ra màn hình (PNGdec) |
+| `net_get.cpp` | HTTPS GET cho bản đồ: kiểm tra DNS, thử lại 3 lần, báo rõ lý do lỗi (TLS, chứng chỉ, thiếu RAM) |
 | `face_ui.cpp`, `claude_async.cpp` | Mặt Claude (canvas 1-bit, đẩy 1 lần qua SPI nên không nháy) và gọi Claude ở luồng nền |
 | `chat_ui.cpp`, `wifi_ui.cpp`, `touch_keyboard.cpp`, `ui_common.cpp` | Chat, Wi-Fi, bàn phím, phần vẽ dùng chung (header có nút `<`) |
 | `mini_json.cpp`, `mini_script.cpp`, `mini_app.cpp` | Bộ chạy app (C++ thuần, có test trên PC) |
@@ -228,5 +229,5 @@ g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../chess_engine.cpp chess_engine_t
 g++ -std=c++17 -Wall -Wextra -Werror -I.. ../bricks_levels.cpp bricks_levels_test.cpp -o bricks_levels_test && ./bricks_levels_test
 ```
 
-CI: `.github/workflows/build-cyd-chatbot.yml` (ở gốc repo) chạy 3 test trên và compile bằng arduino-cli cho 3 cấu hình
-(ESP32-2432S028R ST7789, ESP32-2432S028R ILI9341, NM-CYD-C5). File `.merged.bin` có trong Artifacts.
+CI: `.github/workflows/build-cyd-chatbot-v4.yml` (ở gốc repo) chạy các test trên và compile bằng arduino-cli cho
+ESP32-2432S028R (ST7789 và ILI9341). File `.merged.bin` (nạp ở địa chỉ 0x0) có trong Artifacts.

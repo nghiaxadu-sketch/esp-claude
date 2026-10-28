@@ -11,10 +11,7 @@
 #include "app_store.h"
 #include "board_hw.h"
 #include "config.h"
-
-// Root CA bundle embedded in the arduino-esp32 core (see claude_client.cpp).
-extern const uint8_t kCaBundleStart[] asm("_binary_x509_crt_bundle_start");
-extern const uint8_t kCaBundleEnd[] asm("_binary_x509_crt_bundle_end");
+#include "net_get.h"
 
 namespace map_tiles {
 namespace {
@@ -104,6 +101,7 @@ void makeRoom(fs::FS &fsys, const std::vector<String> &keep, size_t incoming)
 // ---------------------------------------------------------------- PNG decoding from the cache
 
 fs::FS *decodeFs = nullptr;
+String fetchError;  // why the last fetch() left tiles missing, empty when none are
 
 struct Decoder {
     PNG png;
@@ -207,7 +205,13 @@ int fetch(const View &view, const std::function<void(const String &)> &status)
             missing.push_back(t);
         }
     }
-    if (missing.empty() || fsys == nullptr || WiFi.status() != WL_CONNECTED) {
+    fetchError = String();
+    if (!missing.empty() && fsys == nullptr) {
+        fetchError = "Khong co bo nho de luu ban do";
+    } else if (!missing.empty() && WiFi.status() != WL_CONNECTED) {
+        fetchError = "Chua co Wi-Fi";
+    }
+    if (missing.empty() || fetchError.length() > 0) {
         return (int)missing.size();
     }
     if (!fsys->exists(kCacheDir)) {
@@ -216,7 +220,7 @@ int fetch(const View &view, const std::function<void(const String &)> &status)
     makeRoom(*fsys, keep, missing.size());
 
     NetworkClientSecure tls;
-    tls.setCACertBundle(kCaBundleStart, kCaBundleEnd - kCaBundleStart);
+    net_get::useCaBundle(tls);
     HTTPClient http;
     http.setReuse(true);  // one TLS handshake for all tiles of the view
     http.setTimeout(kHttpTimeoutMs);
@@ -227,24 +231,36 @@ int fetch(const View &view, const std::function<void(const String &)> &status)
         status("Dang tai ban do " + String(i + 1) + "/" + String(missing.size()) + "...");
         const String url = tileUrl(missing[i]);
         bool ok = false;
-        if (http.begin(tls, url)) {
-            const int code = http.GET();
-            if (code == HTTP_CODE_OK) {
-                File out = fsys->open(kTempPath, FILE_WRITE);
-                const int written = out ? http.writeToStream(&out) : -1;
-                out.close();
-                ok = written > 0 && fsys->rename(kTempPath, tilePath(missing[i]));
-            } else {
-                Serial.printf("[map] tile %d %s\n", code, url.c_str());
-            }
-            http.end();
+        String error;
+        const int code = net_get::get(http, tls, url, error);
+        if (code == HTTP_CODE_OK) {
+            File out = fsys->open(kTempPath, FILE_WRITE);
+            const int written = out ? http.writeToStream(&out) : -1;
+            out.close();
+            ok = written > 0 && fsys->rename(kTempPath, tilePath(missing[i]));
+        } else {
+            Serial.printf("[map] tile %d %s %s\n", code, error.c_str(), url.c_str());
+        }
+        http.end();
+        if (code < 0) {
+            // The server cannot be reached: the other tiles would only wait for the same timeouts.
+            failed += (int)(missing.size() - i);
+            fetchError = error;
+            break;
         }
         if (!ok) {
             fsys->remove(kTempPath);
             ++failed;
+            fetchError = code == HTTP_CODE_OK ? String("Khong luu duoc o ban do (bo nho day?)")
+                                              : "May chu ban do bao loi " + String(code);
         }
     }
     return failed;
+}
+
+const String &lastError()
+{
+    return fetchError;
 }
 
 bool draw(const View &view, uint16_t fallback)

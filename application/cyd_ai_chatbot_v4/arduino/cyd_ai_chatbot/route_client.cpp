@@ -3,14 +3,10 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <NetworkClientSecure.h>
-#include <WiFi.h>
 
 #include "config.h"
+#include "net_get.h"
 #include "text_utils.h"
-
-// Root CA bundle embedded in the arduino-esp32 core (see claude_client.cpp).
-extern const uint8_t kCaBundleStart[] asm("_binary_x509_crt_bundle_start");
-extern const uint8_t kCaBundleEnd[] asm("_binary_x509_crt_bundle_end");
 
 namespace route_client {
 namespace {
@@ -55,25 +51,19 @@ String urlEncode(const String &text)
 // GETs `url` over HTTPS and parses only the fields in `filter`.
 bool getJson(const String &url, const char *filterJson, JsonDocument &doc, String &error)
 {
-    if (WiFi.status() != WL_CONNECTED) {
-        error = "Chua co Wi-Fi";
-        return false;
-    }
     NetworkClientSecure tls;
-    tls.setCACertBundle(kCaBundleStart, kCaBundleEnd - kCaBundleStart);
+    net_get::useCaBundle(tls);
     HTTPClient http;
     http.useHTTP10(true);  // no chunked encoding, so JSON can be parsed from the stream
     http.setTimeout(kHttpTimeoutMs);
     http.setConnectTimeout(kHttpTimeoutMs);
     http.setUserAgent(kUserAgent);
-    if (!http.begin(tls, url)) {
-        error = "Khong mo duoc ket noi";
-        return false;
-    }
-    const int status = http.GET();
+    const int status = net_get::get(http, tls, url, error);
     Serial.printf("[map] %d %s\n", status, url.c_str());
     if (status != HTTP_CODE_OK) {
-        error = status < 0 ? "Loi mang: " + HTTPClient::errorToString(status) : "May chu bao loi " + String(status);
+        if (status > 0) {
+            error = "May chu bao loi " + String(status);
+        }
         http.end();
         return false;
     }

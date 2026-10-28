@@ -1,0 +1,69 @@
+name: Build CYD Claude Apps v4 (Arduino)
+
+on:
+  push:
+    paths:
+      - "application/cyd_ai_chatbot_v4/**"
+      - ".github/workflows/build-cyd-chatbot-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SKETCH: application/cyd_ai_chatbot_v4/arduino/cyd_ai_chatbot
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: application/cyd_ai_chatbot_v4/arduino/cyd_ai_chatbot/test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test tren PC
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test && ./text_utils_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../mini_json.cpp ../mini_script.cpp ../mini_app.cpp ../text_utils.cpp \
+            ../builtin_apps.cpp ../app_validator.cpp mini_app_test.cpp -o mini_app_test && ./mini_app_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../qr_code.cpp qr_code_test.cpp -o qr_code_test && ./qr_code_test
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../chess_engine.cpp chess_engine_test.cpp -o chess_engine_test && ./chess_engine_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../bricks_levels.cpp bricks_levels_test.cpp -o bricks_levels_test && ./bricks_levels_test
+
+  firmware:
+    needs: host-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cyd-2432s028r-st7789
+            flags: ""
+          - name: cyd-2432s028r-ili9341
+            flags: "-DCYD_DISPLAY_ST7789=0"
+    name: firmware (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cai core ESP32 va thu vien
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib install "Adafruit ILI9341" "Adafruit ST7735 and ST7789 Library" "Adafruit GFX Library" \
+            "ArduinoJson" "PNGdec"
+
+      - name: Bien dich
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --warnings default \
+            --build-property "compiler.cpp.extra_flags=${{ matrix.flags }}" \
+            --output-dir "build/${{ matrix.name }}" "$SKETCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyd_ai_chatbot_v4-${{ matrix.name }}
+          path: build/${{ matrix.name }}/*.bin

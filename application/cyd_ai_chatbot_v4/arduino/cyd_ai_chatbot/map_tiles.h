@@ -30,6 +30,8 @@ double metersPerPixel(double lat, int zoom);
 // Downloads the tiles of `view` that are not cached yet; `status` gets short ASCII progress text.
 // Returns how many tiles are missing afterwards (no Wi-Fi, server error, full flash...).
 int fetch(const View &view, const std::function<void(const String &)> &status);
+// Short ASCII reason why the last fetch() left tiles missing (empty when none are).
+const String &lastError();
 
 // Draws the cached tiles of `view`; areas without a tile are filled with `fallback`.
 // False when nothing could be decoded (e.g. not enough free RAM for the decoder).

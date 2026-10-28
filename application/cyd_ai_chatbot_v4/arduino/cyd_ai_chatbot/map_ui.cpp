@@ -263,8 +263,13 @@ void MapUi::drawFormStatus()
     gfx_.setTextWrap(false);
     gfx_.setTextSize(1);
     gfx_.setTextColor(color);
+    // Up to 2 lines, so a network error keeps its reason (DNS, TLS, RAM...).
     gfx_.setCursor(kFieldX, kStatusY);
-    gfx_.print(ellipsize(line, kSmallLineChars));
+    gfx_.print(line.substring(0, kSmallLineChars));
+    if (line.length() > kSmallLineChars) {
+        gfx_.setCursor(kFieldX, kStatusY + kFontH + 2);
+        gfx_.print(ellipsize(line.substring(kSmallLineChars), kSmallLineChars));
+    }
     gfx_.setTextColor(kColorMuted);
     gfx_.setCursor(kFieldX, kHintY);
     gfx_.print("Xe may di theo duong o to. Toa do: 20.86,106.68");
@@ -512,6 +517,8 @@ void MapUi::drawMapView()
                                       : String("Xem ban do");
     drawBackHeader(gfx_, "Ban do", summary, kColorText);
     drawStepStrip();
+    // The form's 3 footer buttons sit under the gaps between these 5: clear them first.
+    gfx_.fillRect(0, kMapBottom, kScreenW, kScreenH - kMapBottom, kColorBg);
     for (size_t i = 0; i < kMapButtons; ++i) {
         drawButton(gfx_, footerSlot(i, kMapButtons), kMapButtonLabels[i], i == 0 ? kColorButton : kColorKeySpecial,
                    kColorWhite);
@@ -635,6 +642,9 @@ void MapUi::drawMap()
     const bool drewTiles = map_tiles::draw(view, kMapBg);
     if (missing > 0) {
         drawStepStrip();  // remove the download progress text
+        if (map_tiles::lastError().length() > 0) {
+            drawStripNote(map_tiles::lastError());  // why the background is missing
+        }
     }
     if (haveRoute_) {
         drawRoute();
