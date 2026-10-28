@@ -2,4 +2,4 @@
 #pragma once
 
 #define FW_NAME "Claude Apps"
-#define FW_VERSION "5.0.0"
+#define FW_VERSION "5.0.1"

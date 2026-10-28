@@ -51,7 +51,7 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
   rồi bấm **Tim**. Máy vẽ tuyến đường (A xanh lá → B đỏ) **trên nền bản đồ OpenStreetMap thật**, kèm tổng
   quãng đường và thời gian. Ảnh bản đồ được lưu tạm trên flash (tối đa 24 ô) nên xem lại không phải tải. **`<` `>`**: xem từng bước
   ("Re phai vao Pho To Hieu – roi di 520 m", đoạn đó tô cam); **`-` `+`**: thu/phóng; **kéo bút** trên bản đồ để di chuyển.
-  Dùng dữ liệu OpenStreetMap qua Photon (tìm địa chỉ) và OSRM (tìm đường), miễn phí, không cần key. CYD không có
+  Dùng dữ liệu OpenStreetMap qua Nominatim (tìm địa chỉ) và OSRM (tìm đường), miễn phí, không cần key. CYD không có
   GPS nên điểm đi cũng phải gõ (mặc định `MAP_DEFAULT_FROM`); máy nhớ lần tìm gần nhất.
   Chưa tìm đường thì nút **Ban do** mở bản đồ quanh `MAP_HOME_LAT/LON` (Hải Phòng) để xem, kéo, phóng to.
 - **Claude (mặt AI)**: khuôn mặt robot có **mắt, miệng và biểu cảm** (vui, buồn, giận, ngạc nhiên, yêu, suy nghĩ,
@@ -207,7 +207,7 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | `games_ui.cpp`, `game.cpp`, `game_*.cpp` | Menu trò chơi (chọn 1/2 người) và 7 trò (Pong, Caro, XO, Cờ vua, Phá gạch, Rắn, Vẽ) |
 | `chess_engine.cpp` | Luật cờ vua + máy đánh alpha-beta (C++ thuần, test perft trên PC) |
 | `bricks_levels.cpp` | Các màn Phá gạch: 20 màn vẽ sẵn + sinh màn mới không trùng (C++ thuần, có test) |
-| `map_ui.cpp`, `route_client.cpp` | Bản đồ chỉ đường: màn nhập/vẽ tuyến, gọi Photon + OSRM, giải mã polyline |
+| `map_ui.cpp`, `route_client.cpp` | Bản đồ chỉ đường: màn nhập/vẽ tuyến, gọi Nominatim + OSRM, giải mã polyline |
 | `map_tiles.cpp` | Nền bản đồ: tải tile OSM vào flash, giải mã PNG ra màn hình (PNGdec) |
 | `firmware_version.h` | Số phiên bản (hiện ở màn khởi động, Cài đặt > Thiết bị, trang web, Serial) |
 | `net_get.cpp` | HTTPS GET cho bản đồ: kiểm tra DNS, thử lại 3 lần, báo rõ lý do lỗi (TLS, chứng chỉ, thiếu RAM) |

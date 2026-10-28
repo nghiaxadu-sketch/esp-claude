@@ -12,9 +12,16 @@ namespace route_client {
 namespace {
 
 constexpr uint16_t kHttpTimeoutMs = 15000;
-constexpr const char *kUserAgent = "CYD-Claude-Apps/1.0 (ESP32 directions)";
-constexpr const char *kGeocodeUrl = "https://photon.komoot.io/api/?limit=1";
-constexpr const char *kRouteUrlBase = "https://routing.openstreetmap.de/routed-";
+constexpr const char *kUserAgent = "CYD-Claude-Apps/5.0 (ESP32 directions display)";
+// Nominatim (OSM Foundation) still speaks TLS 1.2; Photon and routing.openstreetmap.de only accept TLS 1.3,
+// which the arduino-esp32 core does not have. The route server is therefore reached over plain HTTP: the
+// request only carries two coordinates.
+constexpr const char *kGeocodeUrl =
+    "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=vn&accept-language=vi";
+constexpr float kGeocodeBiasDeg = 0.3f;        // preferred box around MAP_HOME_LAT/LON (not a hard limit)
+constexpr uint32_t kGeocodeMinGapMs = 1100;    // Nominatim usage policy: at most 1 request per second
+constexpr size_t kPlaceNameParts = 3;          // "Aeon Mall Hai Phong - Le Chan, Duong Vo Nguyen Giap, ..."
+constexpr const char *kRouteUrlBase = "http://routing.openstreetmap.de/routed-";
 constexpr const char *kRouteQuery = "?overview=full&geometries=polyline&steps=true";
 constexpr size_t kMaxPathPoints = 3000;  // longer routes are thinned (the screen is only 320 px wide)
 constexpr float kPolylineScale = 1e-5f;  // Google polyline, precision 5
@@ -52,13 +59,15 @@ String urlEncode(const String &text)
 bool getJson(const String &url, const char *filterJson, JsonDocument &doc, String &error)
 {
     NetworkClientSecure tls;
+    NetworkClient plain;
     net_get::useCaBundle(tls);
     HTTPClient http;
     http.useHTTP10(true);  // no chunked encoding, so JSON can be parsed from the stream
     http.setTimeout(kHttpTimeoutMs);
     http.setConnectTimeout(kHttpTimeoutMs);
     http.setUserAgent(kUserAgent);
-    const int status = net_get::get(http, tls, url, error);
+    const int status =
+        url.startsWith("https://") ? net_get::get(http, tls, url, error) : net_get::get(http, plain, url, error);
     Serial.printf("[map] %d %s\n", status, url.c_str());
     if (status != HTTP_CODE_OK) {
         if (status > 0) {
@@ -227,33 +236,43 @@ bool findPlace(const String &query, Place &out, String &error)
         out.name = text;
         return true;
     }
-    const String url = String(kGeocodeUrl) + "&lat=" + String(MAP_HOME_LAT, 4) + "&lon=" + String(MAP_HOME_LON, 4) +
-                       "&q=" + urlEncode(text);
+    static uint32_t lastGeocodeMs = 0;
+    const uint32_t sinceLast = millis() - lastGeocodeMs;
+    if (lastGeocodeMs != 0 && sinceLast < kGeocodeMinGapMs) {
+        delay(kGeocodeMinGapMs - sinceLast);
+    }
+    // viewbox = left,top,right,bottom (lon,lat,lon,lat).
+    const String url = String(kGeocodeUrl) + "&viewbox=" + String(MAP_HOME_LON - kGeocodeBiasDeg, 3) + "," +
+                       String(MAP_HOME_LAT + kGeocodeBiasDeg, 3) + "," + String(MAP_HOME_LON + kGeocodeBiasDeg, 3) +
+                       "," + String(MAP_HOME_LAT - kGeocodeBiasDeg, 3) + "&q=" + urlEncode(text);
     JsonDocument doc;
-    if (!getJson(url,
-                 "{\"features\":[{\"geometry\":{\"coordinates\":true},\"properties\":{\"name\":true,\"street\":true,"
-                 "\"housenumber\":true,\"district\":true,\"city\":true}}]}",
-                 doc, error)) {
+    const bool ok = getJson(url, "[{\"lat\":true,\"lon\":true,\"name\":true,\"display_name\":true}]", doc, error);
+    lastGeocodeMs = millis();
+    if (!ok) {
         return false;
     }
-    JsonVariantConst feature = doc["features"][0];
-    JsonVariantConst coords = feature["geometry"]["coordinates"];
-    if (feature.isNull() || coords.size() < 2) {
+    JsonVariantConst place = doc[0];
+    if (place.isNull() || !place["lat"].is<const char *>() || !place["lon"].is<const char *>()) {
         error = "Khong tim thay \"" + text + "\"";
         return false;
     }
-    out.at.lon = coords[0].as<float>();
-    out.at.lat = coords[1].as<float>();
-    JsonVariantConst p = feature["properties"];
+    out.at.lat = atof(place["lat"].as<const char *>());
+    out.at.lon = atof(place["lon"].as<const char *>());
     out.name = String();
-    if (p["name"].is<const char *>()) {
-        appendPart(out.name, p["name"]);
-    } else {
-        appendPart(out.name, p["housenumber"]);
-        appendPart(out.name, p["street"]);
+    appendPart(out.name, place["name"]);
+    // The first parts of the full address: house/street, ward...
+    const String full = place["display_name"] | "";
+    int from = 0;
+    for (size_t part = 0; part < kPlaceNameParts && from < (int)full.length(); ++part) {
+        int comma = full.indexOf(',', from);
+        if (comma < 0) {
+            comma = full.length();
+        }
+        String piece = full.substring(from, comma);
+        piece.trim();
+        appendPart(out.name, piece.c_str());
+        from = comma + 1;
     }
-    appendPart(out.name, p["district"]);
-    appendPart(out.name, p["city"]);
     if (out.name.length() == 0) {
         out.name = text;
     }

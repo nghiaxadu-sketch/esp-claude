@@ -13,7 +13,7 @@ constexpr int kAttempts = 3;
 constexpr uint32_t kRetryDelayMs = 400;
 constexpr size_t kTlsErrorLen = 96;
 constexpr uint32_t kLowRamBytes = 24 * 1024;  // a TLS handshake needs about this much in one block
-constexpr const char *kHttpsPrefix = "https://";
+constexpr const char *kPeerAlert = "fatal alert";  // mbedTLS: the server ended the handshake
 
 String hostOf(const String &url)
 {
@@ -33,14 +33,8 @@ bool certificateProblem(const char *tlsError)
            strstr(tlsError, "CERT") != nullptr;
 }
 
-}  // namespace
-
-void useCaBundle(NetworkClientSecure &tls)
-{
-    tls.setCACertBundle(kCaBundleStart, kCaBundleEnd - kCaBundleStart);
-}
-
-int get(HTTPClient &http, NetworkClientSecure &tls, const String &url, String &error)
+// Shared by both get(): `tls` is null for plain HTTP.
+int getWith(HTTPClient &http, NetworkClient &client, NetworkClientSecure *tls, const String &url, String &error)
 {
     if (WiFi.status() != WL_CONNECTED) {
         error = "Chua co Wi-Fi";
@@ -53,38 +47,59 @@ int get(HTTPClient &http, NetworkClientSecure &tls, const String &url, String &e
         Serial.printf("[net] DNS failed: %s\n", host.c_str());
         return HTTPC_ERROR_CONNECTION_REFUSED;
     }
-    const bool https = url.startsWith(kHttpsPrefix);
     bool insecureTried = false;
     char tlsError[kTlsErrorLen] = "";
     int status = HTTPC_ERROR_CONNECTION_REFUSED;
     for (int attempt = 1; attempt <= kAttempts; ++attempt) {
         tlsError[0] = '\0';
-        status = http.begin(tls, url) ? http.GET() : HTTPC_ERROR_CONNECTION_REFUSED;
+        status = http.begin(client, url) ? http.GET() : HTTPC_ERROR_CONNECTION_REFUSED;
         if (status > 0) {
             return status;
         }
-        if (https) {
-            tls.lastError(tlsError, sizeof(tlsError));
+        if (tls != nullptr) {
+            tls->lastError(tlsError, sizeof(tlsError));
         }
         Serial.printf("[net] try %d: %d %s | tls: %s | heap %u, max block %u | %s\n", attempt, status,
                       HTTPClient::errorToString(status).c_str(), tlsError, (unsigned)ESP.getFreeHeap(),
                       (unsigned)ESP.getMaxAllocHeap(), url.c_str());
         http.end();
-        if (https && !insecureTried && certificateProblem(tlsError)) {
+        if (strstr(tlsError, kPeerAlert) != nullptr) {
+            break;  // the server refuses this TLS version or cipher: retrying cannot help
+        }
+        if (tls != nullptr && !insecureTried && certificateProblem(tlsError)) {
             Serial.println("[net] certificate check failed, retrying without it (public map data)");
-            tls.setInsecure();
+            tls->setInsecure();
             insecureTried = true;
         }
         delay(kRetryDelayMs * attempt);
     }
     error = "Loi mang: " + HTTPClient::errorToString(status);
-    if (tlsError[0] != '\0') {
+    if (strstr(tlsError, kPeerAlert) != nullptr) {
+        error += " (may chu " + host + " tu choi TLS 1.2 cua ESP32)";
+    } else if (tlsError[0] != '\0') {
         error += String(" (") + tlsError + ")";
     }
     if (ESP.getMaxAllocHeap() < kLowRamBytes) {
         error += " - thieu RAM (" + String(ESP.getMaxAllocHeap() / 1024) + " KB)";
     }
     return status;
+}
+
+}  // namespace
+
+void useCaBundle(NetworkClientSecure &tls)
+{
+    tls.setCACertBundle(kCaBundleStart, kCaBundleEnd - kCaBundleStart);
+}
+
+int get(HTTPClient &http, NetworkClientSecure &tls, const String &url, String &error)
+{
+    return getWith(http, tls, &tls, url, error);
+}
+
+int get(HTTPClient &http, NetworkClient &plain, const String &url, String &error)
+{
+    return getWith(http, plain, nullptr, url, error);
 }
 
 }  // namespace net_get

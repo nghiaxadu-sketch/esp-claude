@@ -1,5 +1,13 @@
 # Claude Apps cho CYD — lịch sử phiên bản
 
+## v5.0.1 (2026-10-28)
+
+- **Sửa "SSL - A fatal alert message was received from our peer" khi bấm Tìm.** Photon và
+  routing.openstreetmap.de chỉ nhận TLS 1.3, còn core arduino-esp32 chỉ có TLS 1.2 nên máy chủ cắt kết nối.
+  Tìm địa chỉ chuyển sang Nominatim (nominatim.openstreetmap.org, còn TLS 1.2); tìm đường gọi OSRM qua HTTP
+  thường (chỉ gửi 2 tọa độ).
+- `net_get`: thêm GET qua HTTP thường; gặp "fatal alert" thì dừng thử lại và báo máy chủ từ chối TLS 1.2.
+
 ## v5.0.0 (2026-10-28)
 
 Gộp từ bản v4 (session "API key vào") và bản sửa lỗi Bản đồ.

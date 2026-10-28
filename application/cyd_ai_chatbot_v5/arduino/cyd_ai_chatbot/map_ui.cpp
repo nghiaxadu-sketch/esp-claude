@@ -274,7 +274,7 @@ void MapUi::drawFormStatus()
     gfx_.setCursor(kFieldX, kHintY);
     gfx_.print("Xe may di theo duong o to. Toa do: 20.86,106.68");
     gfx_.setCursor(kFieldX, kHintY + kFontH + 4);
-    gfx_.print("Ban do (c) OpenStreetMap - Photon, OSRM");
+    gfx_.print("Ban do (c) OpenStreetMap - Nominatim, OSRM");
 }
 
 void MapUi::drawFormFooter()

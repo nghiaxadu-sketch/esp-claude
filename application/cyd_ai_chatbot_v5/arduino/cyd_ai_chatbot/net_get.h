@@ -17,5 +17,7 @@ void useCaBundle(NetworkClientSecure &tls);
 // ASCII text. The certificate is always checked first; when only the check fails, one more try is made
 // without it, since this is only used for public map data that carries no secrets.
 int get(HTTPClient &http, NetworkClientSecure &tls, const String &url, String &error);
+// Same over plain HTTP, for services whose HTTPS needs TLS 1.3 (the arduino-esp32 core only has TLS 1.2).
+int get(HTTPClient &http, NetworkClient &plain, const String &url, String &error);
 
 }  // namespace net_get

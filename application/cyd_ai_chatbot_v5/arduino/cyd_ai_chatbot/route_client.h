@@ -1,5 +1,6 @@
-// Free map services without an API key, used by the "Ban do" screen: Photon (photon.komoot.io) turns a typed
-// address into coordinates, OSRM (routing.openstreetmap.de) finds the route and its turn-by-turn steps.
+// Free map services without an API key, used by the "Ban do" screen: Nominatim (nominatim.openstreetmap.org)
+// turns a typed address into coordinates, OSRM (routing.openstreetmap.de) finds the route and its turn-by-turn
+// steps.
 // Both use OpenStreetMap data. Calls block for a few seconds (HTTPS + JSON).
 #pragma once
 
