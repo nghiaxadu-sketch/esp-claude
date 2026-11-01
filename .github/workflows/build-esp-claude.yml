@@ -74,6 +74,8 @@ jobs:
           path: out/*.bin
 
   release:
+    # Chỉ nhánh main mới được thay firmware trong release (nhánh thử nghiệm chỉ build + artifact)
+    if: github.ref == 'refs/heads/main'
     needs: firmware
     runs-on: ubuntu-latest
     steps:
