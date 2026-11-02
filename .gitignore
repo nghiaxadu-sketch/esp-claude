@@ -48,3 +48,7 @@ pages/simulator/dist
 pages/simulator/*.log
 pages/simulator/public/runtime/*
 !pages/simulator/public/runtime/.gitkeep
+
+# Firmware CYD da nhung API key: chi de nap len may, khong bao gio commit
+*-CO-KEY.bin
+*.keyed.bin

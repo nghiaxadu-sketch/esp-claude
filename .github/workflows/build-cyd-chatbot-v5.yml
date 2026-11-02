@@ -22,6 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Chan API key trong ma nguon
+        run: |
+          if grep -rEn "sk-ant-(usr|api)[0-9]*-[A-Za-z0-9_-]{20,}" application/cyd_ai_chatbot_v5; then
+            echo "Co API key that trong ma nguon - xoa truoc khi push"; exit 1
+          fi
+
       - name: Test tren PC
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test && ./text_utils_test

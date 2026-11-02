@@ -28,7 +28,10 @@ Thêm các tính năng của firmware Lily OS "CYD 03" (2.5.8) cho cùng board E
 - Thiết bị: thêm MAC và mã thiết bị.
 
 **Khác**
-- Vuốt trái → phải để quay lại trên mọi màn không dùng thao tác kéo.
+- Vuốt trái → phải để quay lại ở: Chat, Cài đặt (trừ trang có thanh trượt độ sáng / âm lượng), Wi-Fi, Đồng hồ, Lịch âm,
+  Radio / Nhạc SD, OBD-II, Lốp xe, Mặt Claude. Không có ở màn hình chính, bàn phím, app Claude viết, Trò chơi, Bản đồ,
+  nhập PIN (các màn này dùng thao tác kéo / chạm; vẫn quay lại bằng `<`, giữ màn hình 1,5 s hoặc nút BOOT).
+- Chốt chặn CI: build thất bại nếu mã nguồn chứa API key thật. Bản có key chỉ tạo ngoài GitHub (ghép vào vùng NVS 0x9000).
 - Cảm ứng XPT2046 chạy SPI mềm để bus VSPI dành cho thẻ SD.
 - Thư viện mới: `ESP8266Audio`, `NimBLE-Arduino`.
 - Lệnh Serial mới: `/radio URL`, `/stop`, `/lich`, `/wifilist`.
