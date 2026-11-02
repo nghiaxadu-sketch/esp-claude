@@ -1,0 +1,97 @@
+name: Build CYD Claude Apps v5 (Arduino)
+
+on:
+  push:
+    paths:
+      - "application/cyd_ai_chatbot_v5/**"
+      - ".github/workflows/build-cyd-chatbot-v5.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SKETCH: application/cyd_ai_chatbot_v5/arduino/cyd_ai_chatbot
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: application/cyd_ai_chatbot_v5/arduino/cyd_ai_chatbot/test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test tren PC
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../text_utils.cpp text_utils_test.cpp -o text_utils_test && ./text_utils_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../mini_json.cpp ../mini_script.cpp ../mini_app.cpp ../text_utils.cpp \
+            ../builtin_apps.cpp ../app_validator.cpp mini_app_test.cpp -o mini_app_test && ./mini_app_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../qr_code.cpp qr_code_test.cpp -o qr_code_test && ./qr_code_test
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../chess_engine.cpp chess_engine_test.cpp -o chess_engine_test && ./chess_engine_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../bricks_levels.cpp bricks_levels_test.cpp -o bricks_levels_test && ./bricks_levels_test
+
+  firmware:
+    needs: host-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cyd-2432s028r-st7789
+            flags: ""
+          - name: cyd-2432s028r-ili9341
+            flags: "-DCYD_DISPLAY_ST7789=0"
+    name: firmware (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cai core ESP32 va thu vien
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib install "Adafruit ILI9341" "Adafruit ST7735 and ST7789 Library" "Adafruit GFX Library" \
+            "ArduinoJson" "PNGdec"
+
+      - name: Bien dich
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --warnings default \
+            --build-property "compiler.cpp.extra_flags=${{ matrix.flags }}" \
+            --output-dir build "$SKETCH"
+          mkdir -p out
+          cp build/cyd_ai_chatbot.ino.merged.bin "out/cyd-claude-apps-v5-${{ matrix.name }}.bin"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyd-claude-apps-v5-${{ matrix.name }}
+          path: out/*.bin
+
+  release:
+    needs: firmware
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cyd-claude-apps-v5-latest
+          target_commitish: ${{ github.sha }}
+          name: CYD Claude Apps v5 (ESP32-2432S028R)
+          prerelease: true
+          make_latest: false
+          body: |
+            Firmware Claude Apps v5 cho CYD ESP32-2432S028R (ESP32 classic). Commit ${{ github.sha }}.
+            - `cyd-claude-apps-v5-cyd-2432s028r-st7789.bin`: màn ST7789 (bản USB-C, mặc định).
+            - `cyd-claude-apps-v5-cyd-2432s028r-ili9341.bin`: màn ILI9341 (nếu màu bị sai/âm bản với bản trên).
+            Nạp qua USB ở địa chỉ **0x0**: https://espressif.github.io/esptool-js/ → Connect → Flash Address `0x0` → chọn file → Program.
+            Sau khi nạp: chọn Wi-Fi trên máy, mở http://<IP>/ để nhập API key.
+          files: out/*.bin
