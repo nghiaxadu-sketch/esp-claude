@@ -78,6 +78,19 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
 - Đèn RGB: xanh dương là đang nghĩ, xanh lá là xong, đỏ là lỗi. App có thể tự điều khiển đèn, loa (ESP32-2432S028R
   có cổng loa `SPEAK`), cảm biến ánh sáng, độ sáng màn, đồng hồ NTP và gọi API JSON qua HTTPS (thời tiết...).
 
+### Mới trong v5.1 (từ Lily OS "CYD 03")
+
+Đồng hồ (mặt số / kim, bấm giờ, báo giờ, thời tiết), Lịch âm, Radio, Nhạc thẻ SD, OBD-II (ELM327 BLE / Wi-Fi),
+Áp suất lốp (TPMS BLE), vai trò AI, ngôn ngữ trả lời, mã PIN khóa app, giao diện Sáng / Tối + 20 màu, tự khởi động,
+nhiều Wi-Fi + cấu hình qua điểm phát, vuốt trái → phải để quay lại. Chi tiết: [`../../CHANGELOG.md`](../../CHANGELOG.md),
+so sánh từng mục với Lily: [`../../SO_SANH_CYD03.md`](../../SO_SANH_CYD03.md).
+
+- **Radio** chỉ phát MP3 qua `http://` (Shoutcast / Icecast). Thêm đài ở `http://<IP>/radio`, mỗi dòng `Tên|URL`.
+- **Nhạc SD**: thẻ FAT32, file `.mp3` ở thư mục gốc hoặc `/music`. Loa cắm cổng `SPEAK`.
+- **OBD-II**: cắm ELM327 vào cổng OBD, bật chìa khóa ON. Bluetooth: chọn adapter trong danh sách. Wi-Fi: đổi
+  "Kết nối qua" sang Wi-Fi, chọn mạng của adapter (máy tạm rời Wi-Fi nhà, thoát màn OBD thì tự nối lại).
+- **Lốp xe**: bấm **Ghép**, chạm lốp, rồi bơm/xả hơi để cảm biến phát sóng. Hỗ trợ loại cảm biến "TPMS" BLE phổ biến.
+
 ## 1. Cài Arduino IDE
 
 1. Arduino IDE 2.x → **File → Preferences → Additional boards manager URLs**, thêm:
@@ -89,6 +102,8 @@ Nâng cấp từ bản "CYD AI Chatbot" cũ: Wi-Fi, API key, model và hiệu ch
    - `Adafruit GFX Library`
    - `ArduinoJson` (bản 7.x)
    - `PNGdec` (của Larry Bank, để vẽ nền bản đồ)
+   - `ESP8266Audio` (của Earle Philhower, giải mã MP3 cho Radio / Nhạc SD)
+   - `NimBLE-Arduino` (của h2zero, Bluetooth cho OBD-II và áp suất lốp)
 
 ## 2. Chọn board (Tools)
 
@@ -201,6 +216,12 @@ Một lần tạo app tốn khoảng 5–10 nghìn token (vài trăm đồng v�
 | File | Nội dung |
 |---|---|
 | `cyd_ai_chatbot.ino` | Điểm vào, gọi `chatbotSetup()` / `chatbotLoop()` |
+| `clock_ui.cpp`, `weather_client.cpp` | Đồng hồ, bấm giờ, thời tiết Open-Meteo, múi giờ theo IP |
+| `calendar_ui.cpp`, `lunar_calendar.cpp` | Lịch âm (C++ thuần, có test) |
+| `media_ui.cpp`, `audio_player.cpp`, `radio_stations.cpp` | Radio / Nhạc SD: ESP8266Audio + DAC GPIO26 ở task nền |
+| `obd_ui.cpp`, `obd_link.cpp`, `obd_codec.cpp` | OBD-II: màn hình, phiên ELM327 (BLE / Wi-Fi / mẫu), giải mã J1979 (có test) |
+| `tpms_ui.cpp`, `tpms_codec.cpp`, `ble_link.cpp` | Áp suất lốp, giải mã cảm biến (có test), Bluetooth NimBLE |
+| `pin_ui.cpp`, `personas.cpp`, `settings_pages.cpp` | Mã PIN, vai trò AI, các trang Cài đặt mới |
 | `chatbot_app.cpp` | Luồng chính: chuyển màn hình, chạm/kéo/vuốt, tắt màn, tạo/chạy app, lệnh Serial |
 | `launcher_ui.cpp`, `ui_icons.cpp` | Màn hình chính, icon tròn vẽ bằng GFX |
 | `settings_ui.cpp`, `qr_code.cpp` | Cài đặt (AI Model + QR, Màn hình, Thiết bị), bộ mã hóa QR |
@@ -233,6 +254,9 @@ g++ -std=c++17 -Wall -Wextra -Werror -I.. ../mini_json.cpp ../mini_script.cpp ..
 g++ -std=c++17 -Wall -Wextra -Werror -I.. ../qr_code.cpp qr_code_test.cpp -o qr_code_test && ./qr_code_test
 g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../chess_engine.cpp chess_engine_test.cpp -o chess_engine_test && ./chess_engine_test
 g++ -std=c++17 -Wall -Wextra -Werror -I.. ../bricks_levels.cpp bricks_levels_test.cpp -o bricks_levels_test && ./bricks_levels_test
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../lunar_calendar.cpp lunar_calendar_test.cpp -o lunar_calendar_test && ./lunar_calendar_test
+g++ -std=c++17 -Wall -Wextra -Werror -I.. ../obd_codec.cpp obd_codec_test.cpp -o obd_codec_test && ./obd_codec_test
+g++ -std=c++17 -Wall -Wextra -Werror -I.. ../tpms_codec.cpp tpms_codec_test.cpp -o tpms_codec_test && ./tpms_codec_test
 ```
 
 CI: `.github/workflows/build-cyd-chatbot-v5.yml` (ở gốc repo) chạy các test trên, compile bằng arduino-cli cho

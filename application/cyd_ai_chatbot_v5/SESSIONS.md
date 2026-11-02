@@ -1,11 +1,12 @@
 # Bản đồ các session / nhánh CYD
 
-Bản chính thức hiện tại: **`application/cyd_ai_chatbot_v5/`** (nhánh `claude/focused-einstein-tba9bs`).
+Bản chính thức hiện tại: **`application/cyd_ai_chatbot_v5/`** v5.1 (nhánh `claude/vigilant-feynman-4rsw74`; nhánh `claude/focused-einstein-tba9bs` đã bị xóa, v5.0.1 được đưa lại từ zip).
 Các nhánh dưới đây là lịch sử; tính năng đáng giữ đã nằm trong v5, trừ khi ghi "chưa gộp".
 
 | Nhánh | Session | Nội dung | Trạng thái |
 |---|---|---|---|
-| `claude/focused-einstein-tba9bs` | [API key vào](https://claude.ai/code/session_01Lix14q6QLTwJAhFgtYUYG9) + [Khắc phục lại](https://claude.ai/code/session_019ajZNzorKR45vD2DzRquYs) | v4 → **v5**: Bản đồ, Cờ vua, Phá gạch, theme đen | **Đang dùng** |
+| `claude/vigilant-feynman-4rsw74` | [Lily CYD 03 vào v5](https://claude.ai/code/session_019ajZP1MWpBooqQAXz3DSDP) | v5.0.1 → **v5.1**: Đồng hồ, Lịch âm, Radio, Nhạc SD, OBD-II, TPMS, PIN, vai trò AI, theme | **Đang dùng** |
+| `claude/focused-einstein-tba9bs` | [API key vào](https://claude.ai/code/session_01Lix14q6QLTwJAhFgtYUYG9) + [Khắc phục lại](https://claude.ai/code/session_019ajZNzorKR45vD2DzRquYs) | v4 → **v5**: Bản đồ, Cờ vua, Phá gạch, theme đen | Đã có trong v5.1 (nhánh không còn) |
 | `claude/ecstatic-ride-moczry` | [Nâng cấp cyd_ai_chatbot](https://claude.ai/code/session_01Df54cQZNFWomwNiow2bzap) | Launcher icon tròn, Cài đặt, game, mặt AI, CI 3 board (`arduino/cyd_ai_chatbot`) | Đã có trong v4/v5 |
 | `claude/sleepy-galileo-j8adv8` | [Thiết kế chatbot AI CYD](https://claude.ai/code/session_01VdAzVTcvpKkg57nx1fmCgL) | Hỗ trợ ESP32-2432S028R, ST7789 mặc định; sketch dò vùng chết Wi-Fi (C5, C3) | Chatbot: đã có trong v5. Wi-Fi dead zone: chưa gộp (sketch riêng) |
 | `claude/epic-lovelace-96v739` | [Chương trình tương tự ESP Mosaico](https://claude.ai/code/session_01HK8B1H1LNrrk6X2C9scmPh) | Claude Apps bản đầu (`application/cyd_ai_chatbot`), ghi chú Partition Scheme | Đã có trong v5 |
