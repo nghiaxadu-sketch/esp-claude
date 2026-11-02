@@ -1,4 +1,5 @@
-// Minimal XPT2046 resistive touch driver on a shared SPI bus (no extra library needed).
+// Minimal XPT2046 resistive touch driver (no extra library needed): on a hardware SPI bus, or bit-banged on
+// its own pins so the ESP32's second SPI bus stays free for the microSD card.
 #pragma once
 
 #include <Arduino.h>
@@ -32,6 +33,9 @@ struct TouchRaw {
 class TouchXpt2046 {
 public:
     TouchXpt2046(SPIClass &spi, int8_t csPin, uint16_t screenWidth, uint16_t screenHeight);
+    // Software SPI on the given pins (MISO may be an input-only pin).
+    TouchXpt2046(int8_t sckPin, int8_t mosiPin, int8_t misoPin, int8_t csPin, uint16_t screenWidth,
+                 uint16_t screenHeight);
 
     void begin();
     void setCalibration(const TouchCalibration &cal);
@@ -44,8 +48,14 @@ public:
 
 private:
     uint16_t transfer12(uint8_t command);
+    uint8_t transferByte(uint8_t out);
+    void beginTransfer();
+    void endTransfer();
 
-    SPIClass &spi_;
+    SPIClass *spi_ = nullptr;  // nullptr = bit-banged
+    int8_t sckPin_ = -1;
+    int8_t mosiPin_ = -1;
+    int8_t misoPin_ = -1;
     int8_t csPin_;
     uint16_t width_;
     uint16_t height_;

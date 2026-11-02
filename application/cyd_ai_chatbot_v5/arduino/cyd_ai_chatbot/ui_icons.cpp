@@ -10,7 +10,7 @@ namespace {
 using ui::rgb565;
 
 // Every app logo is an orange disc with a white glyph and dark details.
-constexpr uint16_t kDisc = ui::kColorAccent;
+const uint16_t &kDisc = ui::kColorAccent;  // follows the theme accent
 constexpr uint16_t kInk = ui::kColorWhite;
 constexpr uint16_t kAccent = rgb565(0x1E, 0x1E, 0x22);
 constexpr uint16_t kSky = rgb565(0x7F, 0xD1, 0xFF);
@@ -239,6 +239,68 @@ void chessPawn(const Pen &p)
     p.round(-14, 10, 28, 6, 2, kAccent);
 }
 
+// Tear-off calendar page with rings and a grid of days.
+void calendar(const Pen &p)
+{
+    p.round(-16, -13, 32, 30, 4, kInk);
+    p.rect(-16, -13, 32, 8, kAccent);
+    p.rect(-9, -17, 3, 7, kInk);
+    p.rect(6, -17, 3, 7, kInk);
+    for (int16_t row = 0; row < 3; ++row) {
+        for (int16_t col = 0; col < 4; ++col) {
+            p.rect(-12 + col * 7, -1 + row * 6, 4, 3, row == 1 && col == 2 ? kDisc : kAccent);
+        }
+    }
+}
+
+// Old radio with an antenna and a speaker grille.
+void radio(const Pen &p)
+{
+    p.line(-10, -10, 8, -18, kInk, 2);
+    p.round(-17, -9, 34, 24, 5, kInk);
+    p.dot(-7, 3, 7, kAccent);
+    p.dot(-7, 3, 3, kInk);
+    p.rect(4, -3, 9, 2, kAccent);
+    p.rect(4, 2, 9, 2, kAccent);
+    p.rect(4, 7, 9, 2, kAccent);
+}
+
+// Two eighth notes.
+void music(const Pen &p)
+{
+    p.dot(-9, 10, 6, kInk);
+    p.dot(9, 6, 6, kInk);
+    p.rect(-5, -14, 3, 24, kInk);
+    p.rect(13, -18, 3, 24, kInk);
+    p.tri(-5, -14, 16, -18, 16, -11, kInk);
+    p.tri(-5, -14, -5, -7, 16, -11, kInk);
+    p.dot(-9, 10, 2, kAccent);
+}
+
+// Car seen from the side with a gauge needle (OBD-II).
+void car(const Pen &p)
+{
+    p.round(-19, -2, 38, 12, 4, kInk);
+    p.tri(-12, -2, -6, -12, -6, -2, kInk);
+    p.rect(-6, -12, 12, 10, kInk);
+    p.tri(6, -12, 13, -2, 6, -2, kInk);
+    p.rect(-4, -9, 8, 5, kAccent);
+    p.dot(-10, 11, 5, kAccent);
+    p.dot(10, 11, 5, kAccent);
+    p.dot(-10, 11, 2, kInk);
+    p.dot(10, 11, 2, kInk);
+}
+
+// Tyre with a pressure warning mark (TPMS).
+void tyre(const Pen &p)
+{
+    p.dot(0, 2, 17, kInk);
+    p.dot(0, 2, 11, kDisc);
+    p.dot(0, 2, 7, kInk);
+    p.rect(-1, -6, 3, 8, kAccent);
+    p.dot(0, 6, 2, kAccent);
+}
+
 // Claude-written apps without their own icon: initials on the same orange disc as the other logos.
 void letters(const Pen &p, const String &text)
 {
@@ -307,6 +369,11 @@ void draw(Adafruit_GFX &gfx, Icon icon, int16_t cx, int16_t cy, int16_t r, uint1
     case Icon::Paint: paint(p); break;
     case Icon::Map: mapPin(p); break;
     case Icon::Chess: chessPawn(p); break;
+    case Icon::Calendar: calendar(p); break;
+    case Icon::Radio: radio(p); break;
+    case Icon::Music: music(p); break;
+    case Icon::Car: car(p); break;
+    case Icon::Tyre: tyre(p); break;
     case Icon::Letters: break;
     }
 }

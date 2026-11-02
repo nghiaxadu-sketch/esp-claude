@@ -13,6 +13,7 @@ constexpr uint8_t kCmdPowerDown = 0x90;    // last read with PD bits = 0 re-enab
 constexpr int16_t kRawMax = 4095;
 constexpr int16_t kPressureThreshold = 350;
 constexpr int kSamples = 5;
+constexpr uint32_t kBitHalfPeriodUs = 1;  // ~400 kHz bit-banged clock, well inside the XPT2046 limit
 
 int16_t median(int16_t (&v)[kSamples])
 {
@@ -29,7 +30,14 @@ int16_t mapAxis(int16_t raw, int16_t raw0, int16_t raw1, int16_t s0, int16_t s1,
 }  // namespace
 
 TouchXpt2046::TouchXpt2046(SPIClass &spi, int8_t csPin, uint16_t screenWidth, uint16_t screenHeight)
-    : spi_(spi), csPin_(csPin), width_(screenWidth), height_(screenHeight)
+    : spi_(&spi), csPin_(csPin), width_(screenWidth), height_(screenHeight)
+{
+}
+
+TouchXpt2046::TouchXpt2046(int8_t sckPin, int8_t mosiPin, int8_t misoPin, int8_t csPin, uint16_t screenWidth,
+                           uint16_t screenHeight)
+    : sckPin_(sckPin), mosiPin_(mosiPin), misoPin_(misoPin), csPin_(csPin), width_(screenWidth),
+      height_(screenHeight)
 {
 }
 
@@ -37,6 +45,46 @@ void TouchXpt2046::begin()
 {
     pinMode(csPin_, OUTPUT);
     digitalWrite(csPin_, HIGH);
+    if (spi_ == nullptr) {
+        pinMode(sckPin_, OUTPUT);
+        pinMode(mosiPin_, OUTPUT);
+        pinMode(misoPin_, INPUT);
+        digitalWrite(sckPin_, LOW);
+        digitalWrite(mosiPin_, LOW);
+    }
+}
+
+uint8_t TouchXpt2046::transferByte(uint8_t out)
+{
+    if (spi_ != nullptr) {
+        return spi_->transfer(out);
+    }
+    uint8_t in = 0;
+    for (int bit = 7; bit >= 0; --bit) {  // SPI mode 0: sample on the rising edge
+        digitalWrite(mosiPin_, (out >> bit) & 1);
+        delayMicroseconds(kBitHalfPeriodUs);
+        digitalWrite(sckPin_, HIGH);
+        delayMicroseconds(kBitHalfPeriodUs);
+        in = (uint8_t)(in << 1 | (digitalRead(misoPin_) ? 1 : 0));
+        digitalWrite(sckPin_, LOW);
+    }
+    return in;
+}
+
+void TouchXpt2046::beginTransfer()
+{
+    if (spi_ != nullptr) {
+        spi_->beginTransaction(SPISettings(kTouchSpiHz, MSBFIRST, SPI_MODE0));
+    }
+    digitalWrite(csPin_, LOW);
+}
+
+void TouchXpt2046::endTransfer()
+{
+    digitalWrite(csPin_, HIGH);
+    if (spi_ != nullptr) {
+        spi_->endTransaction();
+    }
 }
 
 void TouchXpt2046::setCalibration(const TouchCalibration &cal)
@@ -46,8 +94,10 @@ void TouchXpt2046::setCalibration(const TouchCalibration &cal)
 
 uint16_t TouchXpt2046::transfer12(uint8_t command)
 {
-    spi_.transfer(command);
-    return spi_.transfer16(0) >> 3;
+    transferByte(command);
+    const uint16_t hi = transferByte(0);
+    const uint16_t lo = transferByte(0);
+    return (uint16_t)(hi << 8 | lo) >> 3;
 }
 
 bool TouchXpt2046::readRaw(TouchRaw &raw)
@@ -55,8 +105,7 @@ bool TouchXpt2046::readRaw(TouchRaw &raw)
     int16_t xs[kSamples];
     int16_t ys[kSamples];
 
-    spi_.beginTransaction(SPISettings(kTouchSpiHz, MSBFIRST, SPI_MODE0));
-    digitalWrite(csPin_, LOW);
+    beginTransfer();
     const int16_t z1 = transfer12(kCmdReadZ1);
     const int16_t z2 = transfer12(kCmdReadZ2);
     const int16_t pressure = z1 + kRawMax - z2;
@@ -68,8 +117,7 @@ bool TouchXpt2046::readRaw(TouchRaw &raw)
         }
     }
     transfer12(kCmdPowerDown);
-    digitalWrite(csPin_, HIGH);
-    spi_.endTransaction();
+    endTransfer();
 
     if (pressure < kPressureThreshold) {
         return false;

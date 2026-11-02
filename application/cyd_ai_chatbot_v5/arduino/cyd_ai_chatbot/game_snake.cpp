@@ -17,7 +17,7 @@ constexpr const char *kBestKey = "hs_snake";
 constexpr uint16_t kFieldColor = rgb565(0x10, 0x18, 0x10);
 constexpr uint16_t kBodyColor = rgb565(0x66, 0xBB, 0x6A);
 constexpr uint16_t kHeadColor = rgb565(0xC5, 0xE1, 0xA5);
-constexpr uint16_t kFoodColor = kColorAccent;
+const uint16_t &kFoodColor = kColorAccent;
 
 }  // namespace
 

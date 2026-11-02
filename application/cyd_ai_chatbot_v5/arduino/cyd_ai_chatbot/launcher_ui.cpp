@@ -79,6 +79,12 @@ void LauncherUi::show(const std::vector<AppTile> &tiles)
         {Icon::Games, LauncherAction::Games, "Tro choi", -1},
         {Icon::Map, LauncherAction::Map, "Ban do", -1},
         {Icon::NewApp, LauncherAction::NewApp, "+ App", -1},
+        {Icon::Clock, LauncherAction::Clock, "Dong ho", -1},
+        {Icon::Calendar, LauncherAction::Calendar, "Lich am", -1},
+        {Icon::Radio, LauncherAction::Radio, "Radio", -1},
+        {Icon::Music, LauncherAction::Music, "Nhac SD", -1},
+        {Icon::Car, LauncherAction::Obd, "OBD-II", -1},
+        {Icon::Tyre, LauncherAction::Tpms, "Lop xe", -1},
     };
     for (size_t i = 0; i < tiles_.size(); ++i) {
         entries_.push_back({ui_icons::iconForApp(tiles_[i].id), LauncherAction::OpenApp, nullptr, (int)i});
@@ -93,7 +99,7 @@ void LauncherUi::show(const std::vector<AppTile> &tiles)
 
 void LauncherUi::draw()
 {
-    gfx_.fillScreen(kColorBlack);
+    gfx_.fillScreen(kColorBg);
     drawTopLine();
     for (size_t slot = 0; slot < kPerPage; ++slot) {
         const size_t index = page_ * kPerPage + slot;
@@ -116,10 +122,10 @@ void LauncherUi::draw()
 
 void LauncherUi::drawTopLine()
 {
-    gfx_.fillRect(0, 0, kScreenW, kTopLineH, kColorBlack);
+    gfx_.fillRect(0, 0, kScreenW, kTopLineH, kColorBg);
     gfx_.setTextWrap(false);
     gfx_.setTextSize(2);
-    gfx_.setTextColor(kColorWhite);
+    gfx_.setTextColor(kColorText);
     gfx_.setCursor(8, 5);
     gfx_.print(clock_.length() > 0 ? clock_ : String("--:--"));
     if (status_.length() > 0) {
@@ -132,7 +138,7 @@ void LauncherUi::drawTopLine()
 
 void LauncherUi::drawNotice()
 {
-    gfx_.fillRect(kArrowW, kNoticeY, kScreenW - 2 * kArrowW, kFontH + 2, kColorBlack);
+    gfx_.fillRect(kArrowW, kNoticeY, kScreenW - 2 * kArrowW, kFontH + 2, kColorBg);
     const String text = notice_.length() > 0 ? notice_ : String("Cham de mo - giu app 1s de sua/xoa");
     drawCentered(gfx_, ellipsize(text, (kScreenW - 2 * kArrowW) / kFontW), kArrowW, kScreenW - 2 * kArrowW,
                  kNoticeY, 1, kColorMuted);
@@ -141,7 +147,7 @@ void LauncherUi::drawNotice()
 void LauncherUi::drawPager()
 {
     const size_t pages = pageCount();
-    gfx_.fillRect(kArrowW, kPagerY - kPagerDotR - 1, kScreenW - 2 * kArrowW, 2 * kPagerDotR + 3, kColorBlack);
+    gfx_.fillRect(kArrowW, kPagerY - kPagerDotR - 1, kScreenW - 2 * kArrowW, 2 * kPagerDotR + 3, kColorBg);
     const int16_t startX = kScreenW / 2 - (int16_t)(pages - 1) * kPagerDotGap / 2;
     for (size_t i = 0; i < pages; ++i) {
         const int16_t x = startX + (int16_t)i * kPagerDotGap;
@@ -151,10 +157,10 @@ void LauncherUi::drawPager()
             gfx_.drawCircle(x, kPagerY, kPagerDotR, kColorMuted);
         }
     }
-    const uint16_t prev = page_ > 0 ? kColorWhite : kColorDivider;
-    const uint16_t next = page_ + 1 < pages ? kColorWhite : kColorDivider;
-    gfx_.fillRect(prevButton_.x, kPagerY - kArrowSize - 1, kArrowW, 2 * kArrowSize + 3, kColorBlack);
-    gfx_.fillRect(nextButton_.x, kPagerY - kArrowSize - 1, kArrowW, 2 * kArrowSize + 3, kColorBlack);
+    const uint16_t prev = page_ > 0 ? kColorText : kColorDivider;
+    const uint16_t next = page_ + 1 < pages ? kColorText : kColorDivider;
+    gfx_.fillRect(prevButton_.x, kPagerY - kArrowSize - 1, kArrowW, 2 * kArrowSize + 3, kColorBg);
+    gfx_.fillRect(nextButton_.x, kPagerY - kArrowSize - 1, kArrowW, 2 * kArrowSize + 3, kColorBg);
     drawChevronLeft(gfx_, 16, kPagerY - kArrowSize, kArrowSize, prev);
     drawChevronRight(gfx_, kScreenW - 16 - kArrowSize - 2, kPagerY - kArrowSize, kArrowSize, next);
 }

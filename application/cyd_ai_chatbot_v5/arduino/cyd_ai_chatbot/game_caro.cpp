@@ -16,7 +16,7 @@ constexpr uint32_t kCpuThinkMs = 300;
 constexpr uint16_t kBoardColor = rgb565(0x14, 0x18, 0x22);
 constexpr uint16_t kGridColor = rgb565(0x34, 0x3A, 0x48);
 constexpr uint16_t kPlayerColor = rgb565(0x7F, 0xD1, 0xFF);
-constexpr uint16_t kCpuColor = kColorAccent;
+const uint16_t &kCpuColor = kColorAccent;
 constexpr uint16_t kLastMoveColor = rgb565(0x4A, 0x3A, 0x22);
 constexpr uint16_t kWinColor = rgb565(0xFF, 0xD5, 0x4F);
 

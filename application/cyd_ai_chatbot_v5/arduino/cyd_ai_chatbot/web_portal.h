@@ -13,11 +13,20 @@ struct Hooks {
     std::function<String(const String &json)> installApp;                         // "" = ok, else error
     std::function<String()> currentModel;
     std::function<bool()> hasApiKey;
+    // Wi-Fi chosen on the page (normal mode or the setup hotspot); handled by the main loop.
+    std::function<void(const String &ssid, const String &password)> saveWifi;
 };
 
 void begin(const Hooks &hooks);
 // Starts the server once Wi-Fi is up and serves requests; call from the main loop.
 void loop();
 bool running();
+
+// "Che do cau hinh Wi-Fi": the board opens its own open hotspot `apName` (http://192.168.4.1, every
+// address leads there) so a phone can pick the home network. Stops by itself after the Wi-Fi is saved.
+bool startAccessPoint(const String &apName);
+void stopAccessPoint();
+bool accessPointActive();
+String accessPointIp();
 
 }  // namespace web_portal

@@ -35,6 +35,19 @@ void setSoundEnabled(bool enabled);
 bool soundEnabled();
 void beep(uint32_t freqHz, uint32_t durationMs);
 void stopBeep();
+// Loudness 0..100 for beeps (PWM duty) and for radio / music (DAC scale).
+void setVolume(uint8_t percent);
+uint8_t volume();
+// Hands the speaker pin to the DAC for radio / music (stops the PWM tone generator), and takes it back.
+void releaseSpeakerForDac();
+void reclaimSpeaker();
+bool speakerOnDac();
+
+// microSD card (ESP32-2432S028R): mounted on demand at /sd for the music player.
+bool hasSdSlot();
+bool sdMount();
+void sdUnmount();
+bool sdMounted();
 // Ambient light 0..100, or -1 when the board has no light sensor.
 int lightPercent();
 

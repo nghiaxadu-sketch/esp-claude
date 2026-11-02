@@ -1,4 +1,5 @@
-// Home screen: round icons for the built-in screens (Settings, Claude face, Chat, Games, Map, + App) followed by
+// Home screen: round icons for the built-in screens (Settings, Claude face, Chat, Games, Map, + App, Clock,
+// Lunar calendar, Radio, SD music, OBD-II, Tyre pressure) followed by
 // the saved Claude apps, 3x2 per page; swipe or tap the arrows to change page. Long press an app for its menu.
 #pragma once
 
@@ -15,7 +16,23 @@ struct AppTile {
     uint16_t color;
 };
 
-enum class LauncherAction : uint8_t { None, OpenApp, AppMenu, Chat, NewApp, Settings, Face, Games, Map };
+enum class LauncherAction : uint8_t {
+    None,
+    OpenApp,
+    AppMenu,
+    Chat,
+    NewApp,
+    Settings,
+    Face,
+    Games,
+    Map,
+    Clock,
+    Calendar,
+    Radio,
+    Music,
+    Obd,
+    Tpms,
+};
 enum class MenuAction : uint8_t { None, Run, Edit, Delete, Cancel };
 
 class LauncherUi {

@@ -11,24 +11,48 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
-// Theme: black backgrounds, white text, orange app icons and accents.
-constexpr uint16_t kColorBg = 0x0000;
-constexpr uint16_t kColorHeader = rgb565(0x2A, 0x2A, 0x2E);  // cards, banners, list rows (on black)
-constexpr uint16_t kColorHeaderBar = 0x0000;                  // the title bar itself
-constexpr uint16_t kColorAccent = rgb565(0xF2, 0x7A, 0x2E);  // orange
-constexpr uint16_t kColorUser = rgb565(0x7F, 0xD1, 0xFF);
-constexpr uint16_t kColorText = 0xFFFF;
-constexpr uint16_t kColorSystem = rgb565(0xFF, 0xC8, 0x57);
-constexpr uint16_t kColorMuted = rgb565(0x8A, 0x8A, 0x90);
+// Theme (Settings > Giao dien): dark (black backgrounds, white text) or light, plus one of 20 accent colors
+// for the app logos, header line and highlights (orange by default). Colors that follow the theme are
+// references into `palette`; fixed colors stay constexpr.
+struct Palette {
+    uint16_t bg;
+    uint16_t header;     // cards, banners, list rows (on the background)
+    uint16_t headerBar;  // the title bar itself
+    uint16_t accent;
+    uint16_t text;
+    uint16_t muted;
+    uint16_t row;
+    uint16_t divider;
+    uint16_t user;
+    uint16_t system;
+};
+extern Palette palette;
+
+constexpr uint8_t kAccentCount = 20;
+// Applies the theme to `palette`; screens pick it up on their next full redraw.
+void applyTheme(bool light, uint8_t accentIndex);
+uint16_t accentColor(uint8_t accentIndex);
+bool lightTheme();
+
+inline const uint16_t &kColorBg = palette.bg;
+inline const uint16_t &kColorHeader = palette.header;
+inline const uint16_t &kColorHeaderBar = palette.headerBar;
+inline const uint16_t &kColorAccent = palette.accent;
+inline const uint16_t &kColorUser = palette.user;
+inline const uint16_t &kColorText = palette.text;
+inline const uint16_t &kColorSystem = palette.system;
+inline const uint16_t &kColorMuted = palette.muted;
+inline const uint16_t &kColorRow = palette.row;  // list rows in Settings
+inline const uint16_t &kColorDivider = palette.divider;
+// Buttons and keys stay dark in both themes (they always carry white labels).
 constexpr uint16_t kColorButton = rgb565(0x3A, 0x3A, 0x40);
 constexpr uint16_t kColorKey = rgb565(0x33, 0x33, 0x38);
 constexpr uint16_t kColorKeySpecial = rgb565(0x4A, 0x4A, 0x52);
 constexpr uint16_t kColorDanger = rgb565(0xC6, 0x28, 0x28);
 constexpr uint16_t kColorOk = rgb565(0x2E, 0x7D, 0x32);
+constexpr uint16_t kColorWarn = rgb565(0xF9, 0xA8, 0x25);
 constexpr uint16_t kColorWhite = 0xFFFF;
 constexpr uint16_t kColorBlack = 0x0000;
-constexpr uint16_t kColorRow = rgb565(0x24, 0x24, 0x28);    // list rows in Settings
-constexpr uint16_t kColorDivider = rgb565(0x3A, 0x3A, 0x40);
 
 constexpr int16_t kScreenW = 320;
 constexpr int16_t kScreenH = 240;

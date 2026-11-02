@@ -2,6 +2,7 @@
 
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_ST7789.h>
+#include <SD.h>
 #include <SPI.h>
 #include <algorithm>
 
@@ -21,13 +22,16 @@ constexpr int16_t kCrossCircle = 6;
 constexpr int kLightRawMax = 4095;
 constexpr uint8_t kMinBrightnessSetting = 5;
 
+constexpr uint32_t kSdSpiHz = 20000000;
+constexpr const char *kSdMountPoint = "/sd";
+constexpr uint32_t kBeepMaxDuty = 1U << (SPEAKER_PWM_BITS - 1);  // 50 % = loudest square wave
+
 #if CYD_SHARED_SPI
 SPIClass &lcdSpi = SPI;
 SPIClass &touchSpi = SPI;
 #else
-SPIClass lcdSpiBus(HSPI);  // ESP32-2432S028R: LCD on HSPI, touch on the default (VSPI) bus
+SPIClass lcdSpiBus(HSPI);  // ESP32-2432S028R: LCD on HSPI, microSD on the default (VSPI) bus, touch bit-banged
 SPIClass &lcdSpi = lcdSpiBus;
-SPIClass &touchSpi = SPI;
 #endif
 
 #if CYD_SHARED_SPI || CYD_DISPLAY_ST7789
@@ -40,7 +44,12 @@ Adafruit_ILI9341 tft(&lcdSpi, CYD_PIN_LCD_DC, CYD_PIN_LCD_CS, CYD_PIN_LCD_RST);
 // The "2USB" ESP32-2432S028R ST7789 panels need inversion; ILI9341 and NM-CYD-C5 do not.
 constexpr bool kDefaultInvert = kUseSt7789 && !CYD_SHARED_SPI;
 
+#if CYD_SHARED_SPI
 TouchXpt2046 touchPanel(touchSpi, CYD_PIN_TOUCH_CS, ui::kScreenW, ui::kScreenH);
+#else
+TouchXpt2046 touchPanel(CYD_PIN_TOUCH_SCK, CYD_PIN_TOUCH_MOSI, CYD_PIN_TOUCH_MISO, CYD_PIN_TOUCH_CS, ui::kScreenW,
+                        ui::kScreenH);
+#endif
 uint8_t backlightPercent = LCD_BRIGHTNESS_PERCENT;
 uint8_t brightnessPercent = LCD_BRIGHTNESS_PERCENT;
 bool screenFlipped = false;
@@ -48,6 +57,9 @@ bool soundOn = true;
 bool speakerReady = false;
 uint32_t beepStopMs = 0;
 bool beeping = false;
+uint8_t volumePercent = 60;
+bool dacOwnsSpeaker = false;
+bool sdIsMounted = false;
 
 void initLed()
 {
@@ -128,9 +140,6 @@ void begin()
         digitalWrite(cs, HIGH);
     }
     lcdSpi.begin(CYD_PIN_LCD_SCK, CYD_PIN_LCD_MISO, CYD_PIN_LCD_MOSI);
-#if !CYD_SHARED_SPI
-    touchSpi.begin(CYD_PIN_TOUCH_SCK, CYD_PIN_TOUCH_MISO, CYD_PIN_TOUCH_MOSI);
-#endif
 
     ledcAttach(CYD_PIN_LCD_BACKLIGHT, BACKLIGHT_PWM_HZ, BACKLIGHT_PWM_BITS);
     setBacklight(LCD_BRIGHTNESS_PERCENT);
@@ -252,7 +261,7 @@ bool hasSpeaker()
 
 void beep(uint32_t freqHz, uint32_t durationMs)
 {
-    if (!hasSpeaker() || !soundOn || freqHz == 0 || durationMs == 0) {
+    if (!hasSpeaker() || !soundOn || dacOwnsSpeaker || volumePercent == 0 || freqHz == 0 || durationMs == 0) {
         return;
     }
     if (!speakerReady) {
@@ -262,6 +271,7 @@ void beep(uint32_t freqHz, uint32_t durationMs)
         }
     }
     ledcWriteTone(CYD_PIN_SPEAKER, freqHz);
+    ledcWrite(CYD_PIN_SPEAKER, kBeepMaxDuty * volumePercent / 100);
     beepStopMs = millis() + durationMs;
     beeping = true;
 }
@@ -338,6 +348,81 @@ void stopBeep()
         ledcWriteTone(CYD_PIN_SPEAKER, 0);
         beeping = false;
     }
+}
+
+void setVolume(uint8_t percent)
+{
+    volumePercent = min<uint8_t>(percent, 100);
+}
+
+uint8_t volume()
+{
+    return volumePercent;
+}
+
+void releaseSpeakerForDac()
+{
+    if (!hasSpeaker() || dacOwnsSpeaker) {
+        return;
+    }
+    stopBeep();
+    if (speakerReady) {
+        ledcDetach(CYD_PIN_SPEAKER);
+        speakerReady = false;
+    }
+    dacOwnsSpeaker = true;
+}
+
+void reclaimSpeaker()
+{
+    if (!dacOwnsSpeaker) {
+        return;
+    }
+    dacOwnsSpeaker = false;
+    pinMode(CYD_PIN_SPEAKER, OUTPUT);
+    digitalWrite(CYD_PIN_SPEAKER, LOW);  // amplifier input at ground: silent until the next beep
+}
+
+bool speakerOnDac()
+{
+    return dacOwnsSpeaker;
+}
+
+bool hasSdSlot()
+{
+    return CYD_HAS_SD;
+}
+
+bool sdMount()
+{
+#if CYD_HAS_SD
+    if (sdIsMounted) {
+        return true;
+    }
+    SPI.begin(CYD_PIN_SD_SCK, CYD_PIN_SD_MISO, CYD_PIN_SD_MOSI, CYD_PIN_SD_CS);
+    sdIsMounted = SD.begin(CYD_PIN_SD_CS, SPI, kSdSpiHz, kSdMountPoint);
+    if (!sdIsMounted) {
+        Serial.println("[sd] no card or mount failed");
+    }
+    return sdIsMounted;
+#else
+    return false;
+#endif
+}
+
+void sdUnmount()
+{
+#if CYD_HAS_SD
+    if (sdIsMounted) {
+        SD.end();
+        sdIsMounted = false;
+    }
+#endif
+}
+
+bool sdMounted()
+{
+    return sdIsMounted;
 }
 
 void service()

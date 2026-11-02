@@ -100,7 +100,7 @@ void WifiUi::drawList()
         const bool isCurrent = current.length() > 0 && n.ssid == current;
         gfx_.fillRoundRect(kMargin, y + 1, kScreenW - 2 * kMargin, kRowH - 2, 4, isCurrent ? kColorOk : kColorHeader);
         gfx_.setTextSize(kNameTextSize);
-        gfx_.setTextColor(kColorWhite);
+        gfx_.setTextColor(kColorText);
         gfx_.setCursor(kMargin + 4, y + (kRowH - kFontH * kNameTextSize) / 2);
         gfx_.print(ellipsize(toAscii(n.ssid), nameChars));
         gfx_.setTextSize(1);

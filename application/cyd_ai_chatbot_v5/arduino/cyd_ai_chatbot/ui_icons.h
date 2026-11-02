@@ -27,6 +27,11 @@ enum class Icon : uint8_t {
     Paint,
     Map,
     Chess,
+    Calendar,
+    Radio,
+    Music,
+    Car,
+    Tyre,
 };
 
 constexpr int16_t kRadius = 30;

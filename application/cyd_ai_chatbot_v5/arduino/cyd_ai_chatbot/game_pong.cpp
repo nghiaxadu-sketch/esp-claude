@@ -23,7 +23,7 @@ constexpr int16_t kCpuAimError = 16;
 constexpr uint16_t kServeDelaySteps = 45;
 constexpr uint8_t kWinScore = 7;
 constexpr uint16_t kPlayerColor = rgb565(0x7F, 0xD1, 0xFF);
-constexpr uint16_t kCpuColor = kColorAccent;
+const uint16_t &kCpuColor = kColorAccent;
 
 }  // namespace
 

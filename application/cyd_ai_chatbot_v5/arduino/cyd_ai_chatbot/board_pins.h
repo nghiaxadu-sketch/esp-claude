@@ -26,7 +26,13 @@ constexpr int8_t CYD_PIN_TOUCH_MISO = 39;
 constexpr int8_t CYD_PIN_TOUCH_MOSI = 32;
 constexpr int8_t CYD_PIN_TOUCH_CS = 33;
 
-constexpr int8_t CYD_PIN_SD_CS = 5;  // unused, held high
+// microSD (TF) slot on the VSPI bus; the touch panel is bit-banged so this bus is free for the card.
+constexpr int8_t CYD_PIN_SD_CS = 5;
+constexpr int8_t CYD_PIN_SD_SCK = 18;
+constexpr int8_t CYD_PIN_SD_MISO = 19;
+constexpr int8_t CYD_PIN_SD_MOSI = 23;
+#define CYD_HAS_SD 1
+#define CYD_HAS_DAC_SPEAKER 1  // GPIO26 is DAC channel 2: radio / music play through the internal DAC
 constexpr int8_t CYD_PIN_LED_RED = 4;
 constexpr int8_t CYD_PIN_LED_GREEN = 16;
 constexpr int8_t CYD_PIN_LED_BLUE = 17;
@@ -52,6 +58,8 @@ constexpr int8_t CYD_PIN_LCD_BACKLIGHT = 25;
 
 constexpr int8_t CYD_PIN_TOUCH_CS = 1;
 constexpr int8_t CYD_PIN_SD_CS = 10;  // unused, held high so the card stays off the bus
+#define CYD_HAS_SD 0           // shares the LCD bus; not used by this sketch
+#define CYD_HAS_DAC_SPEAKER 0
 constexpr int8_t CYD_PIN_RGB_LED = 27;
 constexpr int8_t CYD_PIN_BOOT_BUTTON = 0;
 constexpr int8_t CYD_PIN_SPEAKER = -1;      // no speaker on this board

@@ -30,6 +30,10 @@ jobs:
           g++ -std=c++17 -Wall -Wextra -Werror -I.. ../qr_code.cpp qr_code_test.cpp -o qr_code_test && ./qr_code_test
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../chess_engine.cpp chess_engine_test.cpp -o chess_engine_test && ./chess_engine_test
           g++ -std=c++17 -Wall -Wextra -Werror -I.. ../bricks_levels.cpp bricks_levels_test.cpp -o bricks_levels_test && ./bricks_levels_test
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I.. ../lunar_calendar.cpp lunar_calendar_test.cpp -o lunar_calendar_test && ./lunar_calendar_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../obd_codec.cpp obd_codec_test.cpp -o obd_codec_test && ./obd_codec_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. ../tpms_codec.cpp tpms_codec_test.cpp -o tpms_codec_test && ./tpms_codec_test
+          g++ -std=c++17 -Wall -Wextra -Werror -I.. -c ../personas.cpp -o personas.o
 
   firmware:
     needs: host-test
@@ -55,7 +59,7 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
           arduino-cli lib install "Adafruit ILI9341" "Adafruit ST7735 and ST7789 Library" "Adafruit GFX Library" \
-            "ArduinoJson" "PNGdec"
+            "ArduinoJson" "PNGdec" "ESP8266Audio" "NimBLE-Arduino"
 
       - name: Bien dich
         run: |
@@ -64,6 +68,7 @@ jobs:
             --output-dir build "$SKETCH"
           mkdir -p out
           cp build/cyd_ai_chatbot.ino.merged.bin "out/cyd-claude-apps-v5-${{ matrix.name }}.bin"
+          ls -l build/cyd_ai_chatbot.ino.bin
 
       - uses: actions/upload-artifact@v4
         with:

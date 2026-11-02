@@ -15,7 +15,7 @@ constexpr Rect kNewButton = {kPanelX, 164, kPanelW, 40};
 constexpr uint32_t kCpuThinkMs = 400;
 constexpr int kEasyRandomPercent = 45;
 constexpr uint16_t kPlayerColor = rgb565(0x7F, 0xD1, 0xFF);
-constexpr uint16_t kCpuColor = kColorAccent;
+const uint16_t &kCpuColor = kColorAccent;
 constexpr uint16_t kWinColor = rgb565(0xFF, 0xD5, 0x4F);
 
 const uint8_t kLines[8][3] = {{0, 1, 2}, {3, 4, 5}, {6, 7, 8}, {0, 3, 6},
